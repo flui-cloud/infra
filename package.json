@@ -1,0 +1,37 @@
+{
+  "name": "@flui-cloud/infra",
+  "version": "0.1.0",
+  "description": "Provider-neutral cloud infrastructure layer for the Flui ecosystem — a uniform abstraction over Hetzner, Scaleway, Contabo and OVH (OpenStack).",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc && tsc-alias",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "axios": "^1.16.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=10",
+    "@nestjs/config": ">=3",
+    "@nestjs/swagger": ">=7",
+    "class-transformer": ">=0.5",
+    "class-validator": ">=0.14",
+    "reflect-metadata": ">=0.1",
+    "rxjs": ">=7"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/swagger": "^11.2.6",
+    "@types/node": "^20.19.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.2",
+    "tsc-alias": "^1.8.10",
+    "typescript": "^5.9.3"
+  }
+}
