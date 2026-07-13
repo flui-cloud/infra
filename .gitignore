@@ -3,3 +3,6 @@ dist
 *.tsbuildinfo
 .DS_Store
 CLAUDE.md
+
+# local-only price scraper (kept out of the public repo)
+scripts/update-contabo-prices.mjs

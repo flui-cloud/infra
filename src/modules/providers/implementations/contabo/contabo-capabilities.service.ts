@@ -16,6 +16,11 @@ import {
 } from '../../../management/entities/credentials.entity';
 import { ValidationResultDto } from '../../../management/dto/validation-result.dto';
 import { getRegionCoordinates } from '../../data/region-coordinates';
+import {
+  CONTABO_PRICES,
+  CONTABO_PRICE_CURRENCY,
+  CONTABO_PRICES_FETCHED_AT,
+} from './contabo-prices';
 
 @Injectable()
 export class ContaboCapabilitiesService
@@ -81,76 +86,42 @@ export class ContaboCapabilitiesService
     ];
   }
 
+  // Hardware specs are stable; prices come from the pricing snapshot
+  // (contabo-prices.ts), keyed by plan name.
+  private static readonly VPS_SPECS = [
+    { id: 'CLOUD-VPS-10', name: 'Cloud VPS 10', description: '4 vCPU, 8 GB RAM, 75 GB NVMe', cpu: 4, memory: 8192, disk: 76800, bandwidth: 32000 },
+    { id: 'CLOUD-VPS-20', name: 'Cloud VPS 20', description: '6 vCPU, 12 GB RAM, 100 GB NVMe', cpu: 6, memory: 12288, disk: 102400, bandwidth: 32000 },
+    { id: 'CLOUD-VPS-30', name: 'Cloud VPS 30', description: '8 vCPU, 24 GB RAM, 200 GB NVMe', cpu: 8, memory: 24576, disk: 204800, bandwidth: 32000 },
+    { id: 'CLOUD-VPS-40', name: 'Cloud VPS 40', description: '12 vCPU, 48 GB RAM, 250 GB NVMe', cpu: 12, memory: 49152, disk: 256000, bandwidth: 32000 },
+    { id: 'CLOUD-VPS-50', name: 'Cloud VPS 50', description: '16 vCPU, 64 GB RAM, 300 GB NVMe', cpu: 16, memory: 65536, disk: 307200, bandwidth: 32000 },
+    { id: 'CLOUD-VPS-60', name: 'Cloud VPS 60', description: '18 vCPU, 96 GB RAM, 350 GB NVMe', cpu: 18, memory: 98304, disk: 358400, bandwidth: 32000 },
+  ] as const;
+
   async getSupportedInstanceTypes(): Promise<InstanceTypeInfo[]> {
-    // Contabo bills monthly only — hourly rate is approximate (monthly / 730)
-    return [
-      {
-        id: 'CLOUD-VPS-10',
-        name: 'Cloud VPS 10',
-        description: '4 vCPU, 8 GB RAM, 75 GB NVMe',
-        cpu: 4,
-        memory: 8192,
-        disk: 76800,
-        bandwidth: 32000,
-        pricing: { hourly: 0.0062, monthly: 4.5, currency: 'EUR' },
+    // monthly = real 1-month-term price (the annual term is ~20% less); the
+    // hourly figure is approximate (monthly / 730) — Contabo bills monthly only.
+    return ContaboCapabilitiesService.VPS_SPECS.map((spec) => {
+      const monthly = CONTABO_PRICES[spec.name]?.monthly ?? 0;
+      return {
+        ...spec,
+        pricing: {
+          hourly: Math.round((monthly / 730) * 10000) / 10000,
+          monthly,
+          currency: CONTABO_PRICE_CURRENCY,
+        },
         available: true,
-      },
-      {
-        id: 'CLOUD-VPS-20',
-        name: 'Cloud VPS 20',
-        description: '6 vCPU, 12 GB RAM, 100 GB NVMe',
-        cpu: 6,
-        memory: 12288,
-        disk: 102400,
-        bandwidth: 32000,
-        pricing: { hourly: 0.0096, monthly: 7, currency: 'EUR' },
-        available: true,
-      },
-      {
-        id: 'CLOUD-VPS-30',
-        name: 'Cloud VPS 30',
-        description: '8 vCPU, 24 GB RAM, 200 GB NVMe',
-        cpu: 8,
-        memory: 24576,
-        disk: 204800,
-        bandwidth: 32000,
-        pricing: { hourly: 0.0192, monthly: 14, currency: 'EUR' },
-        available: true,
-      },
-      {
-        id: 'CLOUD-VPS-40',
-        name: 'Cloud VPS 40',
-        description: '12 vCPU, 48 GB RAM, 250 GB NVMe',
-        cpu: 12,
-        memory: 49152,
-        disk: 256000,
-        bandwidth: 32000,
-        pricing: { hourly: 0.0342, monthly: 25, currency: 'EUR' },
-        available: true,
-      },
-      {
-        id: 'CLOUD-VPS-50',
-        name: 'Cloud VPS 50',
-        description: '16 vCPU, 64 GB RAM, 300 GB NVMe',
-        cpu: 16,
-        memory: 65536,
-        disk: 307200,
-        bandwidth: 32000,
-        pricing: { hourly: 0.0507, monthly: 37, currency: 'EUR' },
-        available: true,
-      },
-      {
-        id: 'CLOUD-VPS-60',
-        name: 'Cloud VPS 60',
-        description: '18 vCPU, 96 GB RAM, 350 GB NVMe',
-        cpu: 18,
-        memory: 98304,
-        disk: 358400,
-        bandwidth: 32000,
-        pricing: { hourly: 0.0671, monthly: 49, currency: 'EUR' },
-        available: true,
-      },
-    ];
+      };
+    });
+  }
+
+  /** Cheapest 1-month-term price across all plans (EUR/mo). */
+  private static cheapestMonthly(): number {
+    return Math.min(...Object.values(CONTABO_PRICES).map((p) => p.monthly));
+  }
+
+  /** ISO date the price snapshot was last refreshed (for staleness display). */
+  getPricesFetchedAt(): string {
+    return CONTABO_PRICES_FETCHED_AT;
   }
 
   async getProviderInfo(): Promise<ProviderInfo> {
@@ -245,9 +216,9 @@ export class ContaboCapabilitiesService
         nodeProvisioning: false,
       },
       pricing: {
-        currency: 'EUR',
+        currency: CONTABO_PRICE_CURRENCY,
         billingCycle: 'monthly',
-        minimumCost: 4.5, // Cloud VPS 10: 4 vCPU, 8 GB RAM @ €4.50/mo
+        minimumCost: ContaboCapabilitiesService.cheapestMonthly(),
       },
       firewall: {
         backend: 'host-nftables',

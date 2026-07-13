@@ -148,6 +148,26 @@ export interface ProviderSnapshot {
   description?: string;
 }
 
+/**
+ * Hypervisor-plane resource metrics for a server — read from the provider's
+ * control plane, so entirely agentless (nothing runs on the guest). Fields are
+ * null when the provider does not report that series. Values are point-in-time
+ * (the most recent sample): cpuPercent in %, disk IOPS in ops/s, bandwidth in
+ * bytes/s.
+ */
+export interface ServerMetricsDto {
+  serverId: string;
+  /** Timestamp of the reported sample (RFC3339), or null. */
+  at: string | null;
+  cpuPercent: number | null;
+  diskIopsRead: number | null;
+  diskIopsWrite: number | null;
+  diskBandwidthReadBytes: number | null;
+  diskBandwidthWriteBytes: number | null;
+  netBandwidthInBytes: number | null;
+  netBandwidthOutBytes: number | null;
+}
+
 export interface ICloudProvider {
   listInstances(filters?: any): Promise<InstanceEntity[]>;
 
@@ -161,6 +181,9 @@ export interface ICloudProvider {
   // Server power management
   powerOnServer?(serverId: string): Promise<void>;
   powerOffServer?(serverId: string): Promise<void>;
+
+  // Hypervisor-plane resource metrics (agentless; only where the provider exposes them)
+  getServerMetrics?(serverId: string): Promise<ServerMetricsDto | null>;
 
   // Server label management
   updateServerLabels?(

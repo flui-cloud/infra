@@ -5,6 +5,7 @@ import {
   CreateServerConfig,
   ServerCreationResult,
   ServerDeletionResult,
+  SSHKeyCreationResult,
 } from '../../interfaces/cloud-provider.interface';
 import {
   CreateVNetConfig,
@@ -129,7 +130,9 @@ export class OvhProviderService implements ICloudProvider {
       regions.map(async (region) => {
         try {
           const servers = await client.listServers(region);
-          return servers.map((s) => this.toServerDto(s, region));
+          if (!servers.length) return [];
+          const flavorNames = await this.flavorNameMap(client, region);
+          return servers.map((s) => this.toServerDto(s, region, flavorNames));
         } catch (e) {
           this.logger.warn(`OVH listServers(${region}) failed: ${String(e)}`);
           return [];
@@ -143,9 +146,17 @@ export class OvhProviderService implements ICloudProvider {
     const client = this.requireClient();
     for (const region of await client.regions('compute')) {
       const server = await client.getServer(serverId, region).catch(() => null);
-      if (server) return this.toServerDto(server, region);
+      if (server) return this.toServerDto(server, region, await this.flavorNameMap(client, region));
     }
     return null;
+  }
+
+  /** Nova embeds only the flavor UUID by default; resolve UUID → OVH flavor name. */
+  private async flavorNameMap(
+    client: OpenStackClient,
+    region: string,
+  ): Promise<Map<string, string>> {
+    return new Map((await client.listFlavors(region)).map((f) => [f.id, f.name]));
   }
 
   async getServerStatus(serverId: string): Promise<string> {
@@ -154,14 +165,23 @@ export class OvhProviderService implements ICloudProvider {
     return dto.status;
   }
 
-  private toServerDto(s: OpenStackServer, region: string): ServerResponseDto {
+  private toServerDto(
+    s: OpenStackServer,
+    region: string,
+    flavorNames?: Map<string, string>,
+  ): ServerResponseDto {
     const { publicIp, privateIp } = OvhProviderService.extractIps(s);
+    const flavorId = s.flavor?.id;
     return {
       id: s.id,
       name: s.name,
       provider: CloudProvider.OVH,
       provider_resource_id: s.id,
-      server_type: s.flavor?.original_name ?? s.flavor?.id ?? 'unknown',
+      server_type:
+        s.flavor?.original_name ??
+        (flavorId ? flavorNames?.get(flavorId) : undefined) ??
+        flavorId ??
+        'unknown',
       location: region,
       status: s.status,
       public_ip: publicIp,
@@ -188,6 +208,18 @@ export class OvhProviderService implements ICloudProvider {
 
   async listInstances(): Promise<InstanceEntity[]> {
     return [];
+  }
+
+  /**
+   * Upload a public key as a Nova keypair. OVH keypairs are per-region, so we
+   * register it in every compute region the credential reaches — the keypair
+   * name then resolves at create time regardless of the chosen location.
+   */
+  async createSSHKey(name: string, publicKey: string): Promise<SSHKeyCreationResult> {
+    const client = this.requireClient();
+    const regions = await client.regions('compute');
+    await Promise.all(regions.map((region) => client.ensureKeypair(region, name, publicKey)));
+    return { id: name };
   }
 
   async createServer(config: CreateServerConfig): Promise<ServerCreationResult> {
@@ -228,12 +260,15 @@ export class OvhProviderService implements ICloudProvider {
         : undefined,
     });
 
-    const { publicIp, privateIp } = OvhProviderService.extractIps(server);
+    // Nova's create response (202) carries only the id — re-read once so the
+    // caller gets a real status ('BUILD') and any early IP instead of undefined.
+    const created = await client.getServer(server.id, region).catch(() => null);
+    const { publicIp, privateIp } = OvhProviderService.extractIps(created ?? server);
     return {
       serverId: server.id,
       ipAddress: publicIp,
       privateIp,
-      status: server.status,
+      status: created?.status ?? server.status ?? 'BUILD',
     };
   }
 

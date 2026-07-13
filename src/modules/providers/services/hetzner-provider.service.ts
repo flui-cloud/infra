@@ -11,6 +11,7 @@ import {
   AttachedVolumeResult,
   ChangeServerTypeConfig,
   ProviderVolumeSummary,
+  ServerMetricsDto,
 } from '../interfaces/cloud-provider.interface';
 import { InstanceEntity } from '../../instances/entities/instance.entity';
 import { ICredentialProvider } from '../interfaces/credential-provider.interface';
@@ -35,6 +36,7 @@ import {
   VolumesApi,
   VolumeActionsApi,
   CreateVolumeRequest,
+  GetServerMetricsTypeEnum,
 } from 'src/modules/providers/implementations/hetzner/generated';
 import { NodeSizeDto } from '../dto/node-size.dto';
 import { PricingDto, PricingQueryDto } from '../dto/pricing.dto';
@@ -567,6 +569,55 @@ export class HetznerProviderService implements ICloudProvider {
       }
 
       return 'error';
+    }
+  }
+
+  /**
+   * Hypervisor-plane resource metrics — agentless (read from Hetzner's control
+   * plane, nothing runs on the guest). Returns the most recent CPU / disk / net
+   * sample from the last 5 minutes, or null if metrics are unavailable.
+   */
+  async getServerMetrics(serverId: string): Promise<ServerMetricsDto | null> {
+    try {
+      const serversApi = await this.createServersApi();
+      const end = new Date();
+      const start = new Date(end.getTime() - 5 * 60 * 1000);
+      const response = await serversApi.getServerMetrics(
+        Number.parseInt(serverId),
+        [
+          GetServerMetricsTypeEnum.Cpu,
+          GetServerMetricsTypeEnum.Disk,
+          GetServerMetricsTypeEnum.Network,
+        ],
+        start.toISOString(),
+        end.toISOString(),
+        '60',
+      );
+      const series = response.data.metrics?.time_series ?? {};
+      const latest = (name: string): number | null => {
+        const values = series[name]?.values;
+        if (!values?.length) return null;
+        const raw = values[values.length - 1]?.[1];
+        const n = typeof raw === 'number' ? raw : Number(raw);
+        return Number.isFinite(n) ? n : null;
+      };
+      const cpu = latest('cpu');
+      return {
+        serverId,
+        at: response.data.metrics?.end ?? end.toISOString(),
+        cpuPercent: cpu === null ? null : Math.round(cpu * 100) / 100,
+        diskIopsRead: latest('disk.0.iops.read'),
+        diskIopsWrite: latest('disk.0.iops.write'),
+        diskBandwidthReadBytes: latest('disk.0.bandwidth.read'),
+        diskBandwidthWriteBytes: latest('disk.0.bandwidth.write'),
+        netBandwidthInBytes: latest('network.0.bandwidth.in'),
+        netBandwidthOutBytes: latest('network.0.bandwidth.out'),
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get server metrics for ${serverId}: ${this.describeError(error)}`,
+      );
+      return null;
     }
   }
 

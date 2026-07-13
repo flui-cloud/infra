@@ -36,6 +36,7 @@ import { DeleteServerDto } from 'src/modules/infrastructure/servers/dto/delete-s
 import { ServerResponseDto } from 'src/modules/infrastructure/servers/dto/server-response.dto';
 import { SSHKeyDto } from 'src/modules/access/dto/ssh-key.dto';
 import { NodeSizeDto } from '../dto/node-size.dto';
+import { CONTABO_PRICES } from '../implementations/contabo/contabo-prices';
 import { PricingDto, PricingQueryDto } from '../dto/pricing.dto';
 import { LabelService } from '../../common/services/label.service';
 
@@ -316,10 +317,12 @@ export class ContaboProviderService implements ICloudProvider {
   private static readonly REGIONS = [
     'EU', 'UK', 'US-central', 'US-east', 'US-west', 'SIN', 'IND', 'JPN', 'AUS',
   ];
-  // Contabo bills monthly only (no hourly). Prices are indicative list prices.
+  // Contabo bills monthly only (no hourly). Monthly prices come from the pricing
+  // snapshot (contabo-prices.ts) — the real 1-month-term price; the literal here
+  // is a fallback if the snapshot ever lacks a plan.
   private static readonly CATALOG = [
-    { id: 'CLOUD-VPS-10', name: 'Cloud VPS 10', cores: 4, memoryGb: 8, diskGb: 75, monthly: 4.5 },
-    { id: 'CLOUD-VPS-20', name: 'Cloud VPS 20', cores: 6, memoryGb: 12, diskGb: 100, monthly: 7 },
+    { id: 'CLOUD-VPS-10', name: 'Cloud VPS 10', cores: 4, memoryGb: 8, diskGb: 75, monthly: 5.5 },
+    { id: 'CLOUD-VPS-20', name: 'Cloud VPS 20', cores: 6, memoryGb: 12, diskGb: 100, monthly: 7.5 },
     { id: 'CLOUD-VPS-30', name: 'Cloud VPS 30', cores: 8, memoryGb: 24, diskGb: 200, monthly: 14 },
     { id: 'CLOUD-VPS-40', name: 'Cloud VPS 40', cores: 12, memoryGb: 48, diskGb: 250, monthly: 25 },
     { id: 'CLOUD-VPS-50', name: 'Cloud VPS 50', cores: 16, memoryGb: 64, diskGb: 300, monthly: 37 },
@@ -327,32 +330,35 @@ export class ContaboProviderService implements ICloudProvider {
   ];
 
   async getNodeSizes(): Promise<NodeSizeDto[]> {
-    return ContaboProviderService.CATALOG.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: `${p.cores} vCPU, ${p.memoryGb} GB RAM, ${p.diskGb} GB NVMe`,
-      cores: p.cores,
-      memory: p.memoryGb,
-      disk: p.diskGb,
-      storageType: 'local' as const,
-      cpuType: 'shared' as const,
-      architecture: 'x86' as const,
-      deprecated: false,
-      bareMetal: false,
-      managedFirewall: false,
-      supportsHourlyBilling: false,
-      prices: ContaboProviderService.REGIONS.map((location) => ({
-        location,
-        priceHourly: { net: '0', gross: '0' },
-        priceMonthly: { net: String(p.monthly), gross: String(p.monthly) },
-      })),
-      locations: [],
-      availability: ContaboProviderService.REGIONS.map((location) => ({
-        location,
-        available: true,
+    return ContaboProviderService.CATALOG.map((p) => {
+      const monthly = CONTABO_PRICES[p.name]?.monthly ?? p.monthly;
+      return {
+        id: p.id,
+        name: p.name,
+        description: `${p.cores} vCPU, ${p.memoryGb} GB RAM, ${p.diskGb} GB NVMe`,
+        cores: p.cores,
+        memory: p.memoryGb,
+        disk: p.diskGb,
+        storageType: 'local' as const,
+        cpuType: 'shared' as const,
+        architecture: 'x86' as const,
         deprecated: false,
-      })),
-    }));
+        bareMetal: false,
+        managedFirewall: false,
+        supportsHourlyBilling: false,
+        prices: ContaboProviderService.REGIONS.map((location) => ({
+          location,
+          priceHourly: { net: '0', gross: '0' },
+          priceMonthly: { net: String(monthly), gross: String(monthly) },
+        })),
+        locations: [],
+        availability: ContaboProviderService.REGIONS.map((location) => ({
+          location,
+          available: true,
+          deprecated: false,
+        })),
+      };
+    });
   }
 
   async getPricing(query: PricingQueryDto): Promise<PricingDto> {

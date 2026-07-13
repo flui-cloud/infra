@@ -9,6 +9,8 @@
  * Prices are integers in micro-cents (1 EUR = 100_000_000).
  */
 
+import { isDeniedOvhFlavor } from './ovh-flavor-denylist';
+
 const OVH_PRICE_DIVISOR = 100_000_000;
 const HOURLY_SUFFIX = '.consumption';
 const MONTHLY_SUFFIX = '.monthly.postpaid';
@@ -72,6 +74,7 @@ export function normalizeOvhCatalog(catalog: OvhCatalogResponse): OvhFlavor[] {
     if (!tech?.memory?.size || !tech.cpu?.cores) continue;
 
     const base = addon.planCode.slice(0, -HOURLY_SUFFIX.length);
+    if (isDeniedOvhFlavor(base)) continue;
     const disks = tech.storage?.disks ?? [];
     const regions = addon.configurations?.find((c) => c.name === 'region')?.values ?? [];
 

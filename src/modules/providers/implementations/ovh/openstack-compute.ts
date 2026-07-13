@@ -42,6 +42,21 @@ export abstract class OpenStackCompute extends OpenStackHttpBase {
     return body.images ?? [];
   }
 
+  async listKeypairs(region: string): Promise<string[]> {
+    const nova = await this.endpoint('compute', region);
+    const body = await this.get<{ keypairs: { keypair: { name: string } }[] }>(
+      `${nova}/os-keypairs`,
+    );
+    return (body.keypairs ?? []).map((k) => k.keypair.name);
+  }
+
+  /** Idempotently upload a public key as a Nova keypair (per-region on OVH). */
+  async ensureKeypair(region: string, name: string, publicKey: string): Promise<void> {
+    if ((await this.listKeypairs(region)).includes(name)) return;
+    const nova = await this.endpoint('compute', region);
+    await this.post(`${nova}/os-keypairs`, { keypair: { name, public_key: publicKey } });
+  }
+
   async createServer(region: string, spec: CreateServerSpec): Promise<OpenStackServer> {
     const nova = await this.endpoint('compute', region);
     const body = await this.post<{ server: OpenStackServer }>(`${nova}/servers`, {
