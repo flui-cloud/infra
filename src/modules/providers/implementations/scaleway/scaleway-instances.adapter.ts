@@ -545,12 +545,43 @@ export class ScalewayInstancesAdapter {
     zone: string,
     serverId: string,
   ): Promise<void> {
+    // A Scaleway Instance always belongs to exactly one security group — there is
+    // no "unset". `{ security_group: undefined }` omits the field and is a no-op;
+    // the only real detach is reassigning the project's default security group.
+    const defaultSgId = await this.getProjectDefaultSecurityGroupId(token, zone);
+    if (!defaultSgId) {
+      throw new Error(
+        `Cannot detach security group from server ${serverId}: ` +
+          `no project-default security group found in zone ${zone}.`,
+      );
+    }
     const api = this.createInstancesApi(token);
-    const request: UpdateServerRequest = { security_group: undefined };
+    const securityGroup: ScalewayInstanceV1SecurityGroupTemplate = {
+      id: defaultSgId,
+    };
+    const request: UpdateServerRequest = { security_group: securityGroup };
     await api.updateServer(
       zone as unknown as UpdateServerZoneEnum,
       serverId,
       request,
     );
+  }
+
+  async getProjectDefaultSecurityGroupId(
+    token: string,
+    zone: string,
+  ): Promise<string | null> {
+    const api = this.createSecurityGroupsApi(token);
+    const response = await api.listSecurityGroups(
+      zone as unknown as ListSecurityGroupsZoneEnum,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
+    const groups = response.data.security_groups || [];
+    const def = groups.find((g) => g.project_default) ?? groups[0];
+    return def?.id ?? null;
   }
 }

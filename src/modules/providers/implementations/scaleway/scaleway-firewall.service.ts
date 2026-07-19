@@ -66,6 +66,10 @@ export class ScalewayFirewallService implements IFirewallProvider {
     return { zone: parts[1], serverId: parts[2] };
   }
 
+  private buildResourceId(zone: string, serverId: string): string {
+    return `instance:${zone}:${serverId}`;
+  }
+
   // ─── Rule mapping ──────────────────────────────────────────────────────────
 
   /**
@@ -78,46 +82,44 @@ export class ScalewayFirewallService implements IFirewallProvider {
   ): ScalewayInstanceV1SetSecurityGroupRulesRequestRule[] {
     const result: ScalewayInstanceV1SetSecurityGroupRulesRequestRule[] = [];
     let position = 1;
-
     for (const rule of rules) {
-      const direction =
-        rule.direction === 'in'
-          ? ScalewayInstanceV1SetSecurityGroupRulesRequestRuleDirectionEnum.Inbound
-          : ScalewayInstanceV1SetSecurityGroupRulesRequestRuleDirectionEnum.Outbound;
-
-      const protocol = this.mapProtocol(rule.protocol);
-      const { portFrom, portTo } = this.parsePort(rule.port);
-
-      // Collect applicable CIDRs (source for inbound, destination for outbound)
-      let cidrs: string[];
-      if (rule.direction === 'in') {
-        cidrs =
-          rule.sourceIps && rule.sourceIps.length > 0
-            ? rule.sourceIps
-            : ['0.0.0.0/0'];
-      } else {
-        cidrs =
-          rule.destinationIps && rule.destinationIps.length > 0
-            ? rule.destinationIps
-            : ['0.0.0.0/0'];
-      }
-
-      for (const cidr of cidrs) {
-        result.push({
-          action:
-            ScalewayInstanceV1SetSecurityGroupRulesRequestRuleActionEnum.Accept,
-          protocol,
-          direction,
-          ip_range: cidr,
-          dest_port_from: portFrom,
-          dest_port_to: portTo,
-          position: position++,
-          editable: true,
-        });
+      for (const expanded of this.expandRule(rule)) {
+        result.push({ ...expanded, position: position++ });
       }
     }
-
     return result;
+  }
+
+  // Scaleway wants one rule per CIDR and per port range — expand a Flui rule
+  // (which may carry several source CIDRs and a comma-separated port list) into
+  // that flat form. Comma lists were previously narrowed to their first port.
+  private expandRule(
+    rule: FirewallRule,
+  ): ScalewayInstanceV1SetSecurityGroupRulesRequestRule[] {
+    const direction =
+      rule.direction === 'in'
+        ? ScalewayInstanceV1SetSecurityGroupRulesRequestRuleDirectionEnum.Inbound
+        : ScalewayInstanceV1SetSecurityGroupRulesRequestRuleDirectionEnum.Outbound;
+    const protocol = this.mapProtocol(rule.protocol);
+    const cidrs = this.ruleCidrs(rule);
+    const segments = this.parsePortSegments(rule.port);
+    return cidrs.flatMap((ip_range) =>
+      segments.map(({ portFrom, portTo }) => ({
+        action:
+          ScalewayInstanceV1SetSecurityGroupRulesRequestRuleActionEnum.Accept,
+        protocol,
+        direction,
+        ip_range,
+        dest_port_from: portFrom,
+        dest_port_to: portTo,
+        editable: true,
+      })),
+    );
+  }
+
+  private ruleCidrs(rule: FirewallRule): string[] {
+    const list = rule.direction === 'in' ? rule.sourceIps : rule.destinationIps;
+    return list && list.length > 0 ? list : ['0.0.0.0/0'];
   }
 
   private mapProtocol(
@@ -133,16 +135,27 @@ export class ScalewayFirewallService implements IFirewallProvider {
     }
   }
 
-  private parsePort(port?: string): { portFrom?: number; portTo?: number } {
-    if (!port) return {};
-    const dashIdx = port.indexOf('-');
+  private parsePortSegments(
+    port?: string,
+  ): Array<{ portFrom?: number; portTo?: number }> {
+    if (!port) return [{}];
+    const segments = port
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((seg) => this.parsePortSegment(seg));
+    return segments.length > 0 ? segments : [{}];
+  }
+
+  private parsePortSegment(seg: string): { portFrom?: number; portTo?: number } {
+    const dashIdx = seg.indexOf('-');
     if (dashIdx > 0) {
       return {
-        portFrom: Number.parseInt(port.substring(0, dashIdx), 10),
-        portTo: Number.parseInt(port.substring(dashIdx + 1), 10),
+        portFrom: Number.parseInt(seg.substring(0, dashIdx), 10),
+        portTo: Number.parseInt(seg.substring(dashIdx + 1), 10),
       };
     }
-    const p = Number.parseInt(port, 10);
+    const p = Number.parseInt(seg, 10);
     return { portFrom: p, portTo: p };
   }
 
@@ -155,7 +168,10 @@ export class ScalewayFirewallService implements IFirewallProvider {
       name: sg.name || '',
       rules,
       labels: this.tagsToLabels(sg.tags || []),
-      appliedTo: (sg.servers || []).map((s) => ({ serverId: s.id || '' })),
+      appliedTo: (sg.servers || []).map((s) => ({
+        serverId: this.buildResourceId(sg.zone || '', s.id || ''),
+        serverName: s.name,
+      })),
     };
   }
 
