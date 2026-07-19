@@ -32,6 +32,16 @@ const COORDINATES: Record<CloudProvider, Record<string, RegionCoordinates>> = {
     SGP: { latitude: 1.3521, longitude: 103.8198 },
     SYD: { latitude: -33.8688, longitude: 151.2093 },
   },
+  // Keys are Cherry's own region slugs, which the catalog returns verbatim.
+  [CloudProvider.CHERRY]: {
+    'LT-Siauliai': { latitude: 55.9333, longitude: 23.3167 },
+    'NL-Amsterdam': { latitude: 52.3676, longitude: 4.9041 },
+    'DE-Frankfurt': { latitude: 50.1109, longitude: 8.6821 },
+    'SE-Stockholm': { latitude: 59.3293, longitude: 18.0686 },
+    'US-Chicago': { latitude: 41.8781, longitude: -87.6298 },
+    'SG-Singapore': { latitude: 1.3521, longitude: 103.8198 },
+    'JP-Tokyo': { latitude: 35.6762, longitude: 139.6503 },
+  },
   // BYOS has no provider-defined regions — the operator's host has its own
   // location, unknown to Flui.
   [CloudProvider.BYOS]: {},

@@ -48,3 +48,7 @@ export * from './modules/providers/implementations/ovh/ovh-capabilities.service'
 export * from './modules/providers/implementations/ovh/ovh-catalog';
 export * from './modules/providers/implementations/ovh/ovh-regions';
 export * from './modules/providers/implementations/ovh/openstack-client';
+
+// Cherry Servers (read-only: public catalog, EUR prices, per-region stock)
+export * from './modules/providers/implementations/cherry/cherry-provider.service';
+export * from './modules/providers/implementations/cherry/cherry-catalog';
