@@ -51,6 +51,12 @@ export interface ScalewayInstanceServerType
   name?: string;
 }
 
+/**
+ * Stock grades Scaleway publishes per (instance type × zone). `scarce` is still
+ * orderable — only `shortage` means you cannot get one right now.
+ */
+export type ScalewayStockLevel = 'available' | 'scarce' | 'shortage';
+
 @Injectable()
 export class ScalewayInstancesAdapter {
   private readonly logger = new Logger(ScalewayInstancesAdapter.name);
@@ -354,6 +360,43 @@ export class ScalewayInstancesAdapter {
       ...type,
       name,
     }));
+  }
+
+  /**
+   * Per-zone stock for instance types.
+   *
+   * `GET /instance/v1/zones/{zone}/products/servers/availability` grades every
+   * type as `available` | `scarce` | `shortage`. It is a genuine stock signal —
+   * unlike the products/servers listing, whose presence only means the type is
+   * offered in the zone. Served without authentication; the token is sent anyway
+   * so this call follows the same credential path as the rest of the adapter.
+   *
+   * Returns an empty map when the call fails: the caller must treat "no entry"
+   * as unknown, never as sold out.
+   */
+  async listServerAvailability(
+    token: string,
+    zone: CreateServerZoneEnum,
+  ): Promise<Map<string, ScalewayStockLevel>> {
+    const http = this.createAxiosInstance();
+    const url = `${this.baseUrl}/instance/v1/zones/${zone}/products/servers/availability`;
+    const result = new Map<string, ScalewayStockLevel>();
+    try {
+      const response = await http.get<{
+        servers?: Record<string, { availability?: string }>;
+      }>(url, { headers: { 'X-Auth-Token': token } });
+      for (const [name, entry] of Object.entries(response.data.servers ?? {})) {
+        const level = entry?.availability;
+        if (level === 'available' || level === 'scarce' || level === 'shortage') {
+          result.set(name, level);
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Scaleway availability unavailable for ${zone}: ${err.message}`,
+      );
+    }
+    return result;
   }
 
   // ─── User data (cloud-init) ────────────────────────────────────────────────

@@ -9,6 +9,17 @@ import {
   ListServerTypes200ResponseServerTypesInnerLocationsInner,
 } from 'src/modules/providers/implementations/hetzner/generated';
 
+/**
+ * `/v1/server_types` returns `available` and `recommended` per location, but the
+ * vendored OpenAPI client predates those fields. Widen at the boundary rather
+ * than editing generated code, so a client regeneration cannot silently drop them.
+ */
+type HetznerServerTypeLocation =
+  ListServerTypes200ResponseServerTypesInnerLocationsInner & {
+    available?: boolean;
+    recommended?: boolean;
+  };
+
 @Injectable()
 export class NodeSizeMapper {
   /**
@@ -58,7 +69,7 @@ export class NodeSizeMapper {
    * Maps Hetzner location data to NodeSizeLocationDto
    */
   private mapLocation(
-    location: ListServerTypes200ResponseServerTypesInnerLocationsInner,
+    location: HetznerServerTypeLocation,
   ): NodeSizeLocationDto {
     return {
       id: location.id,
@@ -69,6 +80,8 @@ export class NodeSizeMapper {
             announced: location.deprecation.announced,
           }
         : null,
+      available: location.available,
+      recommended: location.recommended,
     };
   }
 

@@ -41,6 +41,7 @@ import { LabelService } from '../../../common/services/label.service';
 import {
   ScalewayInstancesAdapter,
   ScalewayInstanceServerType,
+  ScalewayStockLevel,
   INSTANCE_ZONES,
 } from './scaleway-instances.adapter';
 import {
@@ -1523,6 +1524,12 @@ export class ScalewayProviderService implements ICloudProvider {
           {
             type: ReturnType<typeof Object.assign>;
             availableRegions: Set<string>;
+            /**
+             * region → in stock in at least one of its zones. A region is
+             * orderable if any zone can serve it, so grades OR together.
+             * Absent = no zone reported a grade → unknown, not sold out.
+             */
+            stockByRegion: Map<string, boolean>;
             pricesByRegion: Map<
               string,
               { hourly: number; monthlyCap?: number }
@@ -1536,6 +1543,24 @@ export class ScalewayProviderService implements ICloudProvider {
           ),
         );
 
+        // Real per-zone stock, fetched alongside the catalog. A zone whose call
+        // fails contributes no entries, so its types stay unknown rather than
+        // being reported as sold out.
+        const availabilityByZone = new Map<
+          string,
+          Map<string, ScalewayStockLevel>
+        >();
+        const availabilityResults = await Promise.allSettled(
+          INSTANCE_ZONES.map((zone) =>
+            this.instancesAdapter.listServerAvailability(token, zone),
+          ),
+        );
+        for (const [i, result] of availabilityResults.entries()) {
+          if (result.status === 'fulfilled' && result.value.size) {
+            availabilityByZone.set(INSTANCE_ZONES[i] as string, result.value);
+          }
+        }
+
         for (const [i, result] of instanceZoneResults.entries()) {
           if (result.status !== 'fulfilled') continue;
           const zone = INSTANCE_ZONES[i];
@@ -1546,11 +1571,21 @@ export class ScalewayProviderService implements ICloudProvider {
               typeMap.set(t.name, {
                 type: t,
                 availableRegions: new Set(),
+                stockByRegion: new Map(),
                 pricesByRegion: new Map(),
               });
             }
             const entry = typeMap.get(t.name);
             entry.availableRegions.add(region);
+            // `scarce` is low stock but still orderable; only `shortage` is not.
+            const level = availabilityByZone.get(zone as string)?.get(t.name);
+            if (level) {
+              const inStock = level !== 'shortage';
+              entry.stockByRegion.set(
+                region,
+                (entry.stockByRegion.get(region) ?? false) || inStock,
+              );
+            }
             if (t.hourly_price != null && !entry.pricesByRegion.has(region)) {
               entry.pricesByRegion.set(region, {
                 hourly: t.hourly_price,
@@ -1619,12 +1654,22 @@ export class ScalewayProviderService implements ICloudProvider {
             });
           }
 
-          const availability = Array.from(entry.availableRegions).map(
-            (region) => ({
-              location: region,
-              available: true,
-              deprecated: t.end_of_service ?? false,
-            }),
+          // Regions with no reported grade are omitted: downstream reads a
+          // missing row as unknown, which is the truth. Emitting `true` there —
+          // as this did before — dressed mere coverage up as live stock.
+          const availability = Array.from(entry.availableRegions).flatMap(
+            (region) => {
+              const inStock = entry.stockByRegion.get(region);
+              return inStock === undefined
+                ? []
+                : [
+                    {
+                      location: region,
+                      available: inStock,
+                      deprecated: t.end_of_service ?? false,
+                    },
+                  ];
+            },
           );
 
           nodeSizes.push({
@@ -1646,9 +1691,11 @@ export class ScalewayProviderService implements ICloudProvider {
                 ? SBS_5K_PRICE_PER_GB_MONTHLY
                 : undefined,
             prices,
-            locations: availability.map((av) => ({
+            // Coverage — every region the type is offered in. Kept independent
+            // of `availability`, which now omits regions with no stock signal.
+            locations: Array.from(entry.availableRegions).map((region) => ({
               id: 0,
-              name: av.location,
+              name: region,
               deprecation: null,
             })),
             availability,
@@ -1727,13 +1774,20 @@ export class ScalewayProviderService implements ICloudProvider {
             supportsHourlyBilling: true, // Elastic Metal supports hourly billing (pay-as-you-go)
             prices: [priceEntry],
             locations: [{ id: 0, name: regionName, deprecation: null }],
-            availability: [
-              {
-                location: regionName,
-                available: offer.enable ?? true,
-                deprecated: false,
-              },
-            ],
+            // `stock` is the inventory grade (empty | low | available); `enable`
+            // only says the offer is sellable, which is not the same question.
+            // `low` is still orderable, so only `empty` counts as out of stock.
+            // No grade at all → omit the row, so it reads as unknown.
+            availability:
+              offer.stock === undefined
+                ? []
+                : [
+                    {
+                      location: regionName,
+                      available: offer.stock !== 'empty',
+                      deprecated: false,
+                    },
+                  ],
           });
         }
       }

@@ -26,7 +26,6 @@ import {
   ServerTypesApi,
   PricingApi,
   ServerActionsApi,
-  DataCentersApi,
   ListServers200ResponseServersInner,
   ListServers200ResponseServersInnerStatusEnum,
   ListServerTypes200ResponseServerTypesInner,
@@ -257,15 +256,6 @@ export class HetznerProviderService implements ICloudProvider {
     const configuration = await this.createConfiguration();
     const axiosInstance = this.createAxiosInstance();
     return new ActionsApi(configuration, this.basePath, axiosInstance);
-  }
-
-  /**
-   * Create DataCentersApi instance with custom Axios configuration
-   */
-  private async createDataCentersApi(): Promise<DataCentersApi> {
-    const configuration = await this.createConfiguration();
-    const axiosInstance = this.createAxiosInstance();
-    return new DataCentersApi(configuration, this.basePath, axiosInstance);
   }
 
   async listInstances(filters?: any): Promise<InstanceEntity[]> {
@@ -1156,26 +1146,28 @@ export class HetznerProviderService implements ICloudProvider {
         (nodeSize) => nodeSize.architecture !== 'arm',
       );
 
-      // If requested, enrich with real-time availability (NO CACHE)
+      // If requested, project the per-location availability that listServerTypes()
+      // already returned. No second request: `/v1/server_types` carries
+      // `locations[].available`, which replaced the availability list of the
+      // deprecated `/v1/datacenters` (410 Gone after 2026-10-01).
       if (includeAvailability) {
-        const availabilityMap = await this.getDatacenterAvailability();
-
-        nodeSizes = nodeSizes.map((nodeSize) => {
-          const serverTypeId = Number.parseInt(nodeSize.id);
-
-          // Build availability info for each location this server type supports
-          const availability = nodeSize.locations.map((loc) => ({
-            location: loc.name,
-            available:
-              availabilityMap.get(loc.name)?.has(serverTypeId) ?? false,
-            deprecated: !!loc.deprecation,
-          }));
-
-          return {
-            ...nodeSize,
-            availability,
-          };
-        });
+        nodeSizes = nodeSizes.map((nodeSize) => ({
+          ...nodeSize,
+          // A location with no `available` field (stale client, API change)
+          // carries no signal, which is not the same as "sold out". Omit the row
+          // so it reads downstream as unknown instead of a false out-of-stock.
+          availability: nodeSize.locations.flatMap((loc) =>
+            loc.available == null
+              ? []
+              : [
+                  {
+                    location: loc.name,
+                    available: loc.available,
+                    deprecated: !!loc.deprecation,
+                  },
+                ],
+          ),
+        }));
       }
 
       // Sort by price (ascending, using first location's hourly gross price)
@@ -1238,48 +1230,6 @@ export class HetznerProviderService implements ICloudProvider {
     const serverTypesApi = await this.createServerTypesApi();
     const response = await serverTypesApi.listServerTypes();
     return response.data.server_types;
-  }
-
-  /**
-   * Get datacenter availability from Hetzner
-   * Returns a map of location name to Set of available server type IDs
-   */
-  private async getDatacenterAvailability(): Promise<Map<string, Set<number>>> {
-    this.logger.log('Fetching datacenter availability from Hetzner API');
-
-    try {
-      const datacenterApi = await this.createDataCentersApi();
-      const response = await datacenterApi.listDatacenters();
-
-      // Build a map: location name -> Set of available server type IDs
-      const availabilityMap = new Map<string, Set<number>>();
-
-      response.data.datacenters.forEach((dc) => {
-        const locationName = dc.location.name;
-
-        if (!availabilityMap.has(locationName)) {
-          availabilityMap.set(locationName, new Set());
-        }
-
-        // Add all available server type IDs for this location
-        dc.server_types.available.forEach((typeId) => {
-          availabilityMap.get(locationName).add(typeId);
-        });
-      });
-
-      this.logger.log(
-        `Fetched availability for ${availabilityMap.size} locations from ${response.data.datacenters.length} datacenters`,
-      );
-
-      return availabilityMap;
-    } catch (error) {
-      this.logger.error(
-        `Failed to fetch datacenter availability: ${this.describeError(error)}`,
-      );
-      throw new Error(
-        `Failed to fetch datacenter availability: ${error.message}`,
-      );
-    }
   }
 
   /**

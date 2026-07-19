@@ -19,6 +19,15 @@ export class NodeSizeLocationDto {
   id: number;
   name: string;
   deprecation: DeprecationInfoDto | null;
+  /**
+   * Whether this size can be ordered in this location right now. Hetzner serves
+   * it inline on `/v1/server_types`, replacing the availability list of the
+   * deprecated `/v1/datacenters` (removed after 2026-10-01).
+   * Undefined when the provider publishes no stock signal.
+   */
+  available?: boolean;
+  /** Provider steers new orders here. Not a stock signal. */
+  recommended?: boolean;
 }
 
 export class NodeSizeLocationAvailabilityDto {
