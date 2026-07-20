@@ -16,6 +16,8 @@ export * from './modules/providers/interfaces/network-provider.interface';
 export * from './modules/providers/dto/node-size.dto';
 export * from './modules/access/dto/bearer-token.dto';
 export * from './modules/management/entities/provider-capabilities.entity';
+export * from './modules/management/entities/credentials.entity';
+export * from './modules/providers/interfaces/provider-capabilities.interface';
 
 // Factories & module
 export * from './modules/providers/core/factories/provider.factory';
@@ -49,6 +51,9 @@ export * from './modules/providers/implementations/ovh/ovh-catalog';
 export * from './modules/providers/implementations/ovh/ovh-regions';
 export * from './modules/providers/implementations/ovh/openstack-client';
 
-// Cherry Servers (read-only: public catalog, EUR prices, per-region stock)
+// Cherry Servers: public catalog (EUR prices, per-region stock) + full provisioning
 export * from './modules/providers/implementations/cherry/cherry-provider.service';
 export * from './modules/providers/implementations/cherry/cherry-catalog';
+export * from './modules/providers/implementations/cherry/cherry-client';
+export * from './modules/providers/implementations/cherry/cherry-mappers';
+export * from './modules/providers/implementations/cherry/cherry-capabilities.service';

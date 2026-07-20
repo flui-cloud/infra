@@ -28,4 +28,7 @@ export interface ProviderCredentials {
 
   // Bearer Token fields (type: bearer_token)
   bearerToken?: string;
+
+  // Scoping target for providers that deploy into a project (type: api_key, e.g. Cherry)
+  projectId?: string;
 }

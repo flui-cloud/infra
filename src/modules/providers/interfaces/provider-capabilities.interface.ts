@@ -54,7 +54,8 @@ export interface CredentialFieldDefinition {
     | 'password'
     | 'clientId'
     | 'clientSecret'
-    | 'bearerToken';
+    | 'bearerToken'
+    | 'projectId';
   /** Label shown in the Flui UI */
   label: string;
   /** Exact name the provider uses for this field (for UI consistency with provider docs) */
