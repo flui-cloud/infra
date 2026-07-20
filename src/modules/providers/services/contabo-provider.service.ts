@@ -319,14 +319,31 @@ export class ContaboProviderService implements ICloudProvider {
   ];
   // Contabo bills monthly only (no hourly). Monthly prices come from the pricing
   // snapshot (contabo-prices.ts) — the real 1-month-term price; the literal here
-  // is a fallback if the snapshot ever lacks a plan.
-  private static readonly CATALOG = [
-    { id: 'CLOUD-VPS-10', name: 'Cloud VPS 10', cores: 4, memoryGb: 8, diskGb: 75, monthly: 5.5 },
-    { id: 'CLOUD-VPS-20', name: 'Cloud VPS 20', cores: 6, memoryGb: 12, diskGb: 100, monthly: 7.5 },
-    { id: 'CLOUD-VPS-30', name: 'Cloud VPS 30', cores: 8, memoryGb: 24, diskGb: 200, monthly: 14 },
-    { id: 'CLOUD-VPS-40', name: 'Cloud VPS 40', cores: 12, memoryGb: 48, diskGb: 250, monthly: 25 },
-    { id: 'CLOUD-VPS-50', name: 'Cloud VPS 50', cores: 16, memoryGb: 64, diskGb: 300, monthly: 37 },
-    { id: 'CLOUD-VPS-60', name: 'Cloud VPS 60', cores: 18, memoryGb: 96, diskGb: 350, monthly: 49 },
+  // is a fallback if the snapshot ever lacks a plan. Two lines: the shared VPS,
+  // and the dedicated-vCPU VDS ("Max Performance", AMD EPYC cores reserved to you).
+  private static readonly CATALOG: ReadonlyArray<{
+    id: string;
+    name: string;
+    cores: number;
+    memoryGb: number;
+    diskGb: number;
+    monthly: number;
+    cpuType: 'shared' | 'dedicated';
+    storage: 'SSD' | 'NVMe';
+  }> = [
+    // VPS line renamed by Contabo — the number is now the core count (was 10/20/…/60),
+    // and the default storage is the larger SSD tier.
+    { id: 'CLOUD-VPS-4', name: 'Cloud VPS 4', cores: 4, memoryGb: 8, diskGb: 100, monthly: 5.5, cpuType: 'shared', storage: 'SSD' },
+    { id: 'CLOUD-VPS-6', name: 'Cloud VPS 6', cores: 6, memoryGb: 12, diskGb: 200, monthly: 7.5, cpuType: 'shared', storage: 'SSD' },
+    { id: 'CLOUD-VPS-8', name: 'Cloud VPS 8', cores: 8, memoryGb: 24, diskGb: 300, monthly: 14, cpuType: 'shared', storage: 'SSD' },
+    { id: 'CLOUD-VPS-12', name: 'Cloud VPS 12', cores: 12, memoryGb: 48, diskGb: 400, monthly: 25, cpuType: 'shared', storage: 'SSD' },
+    { id: 'CLOUD-VPS-16', name: 'Cloud VPS 16', cores: 16, memoryGb: 64, diskGb: 500, monthly: 37, cpuType: 'shared', storage: 'SSD' },
+    { id: 'CLOUD-VPS-18', name: 'Cloud VPS 18', cores: 18, memoryGb: 96, diskGb: 600, monthly: 49, cpuType: 'shared', storage: 'SSD' },
+    { id: 'CLOUD-VDS-S', name: 'Cloud VDS S', cores: 6, memoryGb: 24, diskGb: 180, monthly: 39, cpuType: 'dedicated', storage: 'NVMe' },
+    { id: 'CLOUD-VDS-M', name: 'Cloud VDS M', cores: 8, memoryGb: 32, diskGb: 240, monthly: 49, cpuType: 'dedicated', storage: 'NVMe' },
+    { id: 'CLOUD-VDS-L', name: 'Cloud VDS L', cores: 12, memoryGb: 48, diskGb: 360, monthly: 69, cpuType: 'dedicated', storage: 'NVMe' },
+    { id: 'CLOUD-VDS-XL', name: 'Cloud VDS XL', cores: 16, memoryGb: 64, diskGb: 480, monthly: 94, cpuType: 'dedicated', storage: 'NVMe' },
+    { id: 'CLOUD-VDS-XXL', name: 'Cloud VDS XXL', cores: 24, memoryGb: 96, diskGb: 720, monthly: 139, cpuType: 'dedicated', storage: 'NVMe' },
   ];
 
   async getNodeSizes(): Promise<NodeSizeDto[]> {
@@ -335,12 +352,12 @@ export class ContaboProviderService implements ICloudProvider {
       return {
         id: p.id,
         name: p.name,
-        description: `${p.cores} vCPU, ${p.memoryGb} GB RAM, ${p.diskGb} GB NVMe`,
+        description: `${p.cores} ${p.cpuType === 'dedicated' ? 'dedicated vCores' : 'vCPU'}, ${p.memoryGb} GB RAM, ${p.diskGb} GB ${p.storage}`,
         cores: p.cores,
         memory: p.memoryGb,
         disk: p.diskGb,
         storageType: 'local' as const,
-        cpuType: 'shared' as const,
+        cpuType: p.cpuType,
         architecture: 'x86' as const,
         deprecated: false,
         bareMetal: false,
