@@ -61,8 +61,7 @@ export class CherryProviderService implements ICloudProvider {
       memory: p.memory,
       disk: p.disk,
       storageType: 'local',
-      // Everything except the shared `vps` line is dedicated silicon.
-      cpuType: p.type === 'vps' ? 'shared' : 'dedicated',
+      cpuType: p.type === 'vps' || p.type === 'storage-vps' ? 'shared' : 'dedicated',
       architecture: p.arm ? 'arm' : 'x86',
       deprecated: false,
       bareMetal: p.bareMetal,

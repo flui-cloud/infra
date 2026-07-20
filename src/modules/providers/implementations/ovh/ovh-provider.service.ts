@@ -69,7 +69,7 @@ export class OvhProviderService implements ICloudProvider {
       memory: f.ramGb,
       disk: f.diskGb,
       storageType: 'local',
-      cpuType: f.category === 'cpu' ? 'dedicated' : 'shared',
+      cpuType: f.category === 'discovery' ? 'shared' : 'dedicated',
       architecture: 'x86',
       deprecated: false,
       bareMetal: false,

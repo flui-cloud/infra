@@ -1,6 +1,6 @@
 {
   "name": "@flui-cloud/infra",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Provider-neutral cloud infrastructure layer for the Flui ecosystem — a uniform abstraction over Hetzner, Scaleway, Contabo and OVH (OpenStack).",
   "license": "Apache-2.0",
   "main": "dist/index.js",
