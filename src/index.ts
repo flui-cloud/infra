@@ -7,9 +7,11 @@
 
 // Enums & core interfaces
 export * from './modules/providers/enums/cloud-provider.enum';
+export * from './modules/providers/enums/dns-provider.enum';
 export * from './modules/providers/interfaces/cloud-provider.interface';
 export * from './modules/providers/interfaces/credential-provider.interface';
 export * from './modules/providers/interfaces/firewall-provider.interface';
+export * from './modules/providers/interfaces/dns-provider.interface';
 export * from './modules/providers/interfaces/network-provider.interface';
 
 // DTOs / entities
@@ -23,16 +25,19 @@ export * from './modules/providers/interfaces/provider-capabilities.interface';
 export * from './modules/providers/core/factories/provider.factory';
 export * from './modules/providers/core/factories/capabilities-provider.factory';
 export * from './modules/providers/core/factories/firewall-provider.factory';
+export * from './modules/providers/core/factories/dns-provider.factory';
 export * from './modules/providers/provider-core.module';
 
 // Provider implementations — Hetzner
 export * from './modules/providers/services/hetzner-provider.service';
 export * from './modules/providers/services/hetzner-firewall.service';
+export * from './modules/providers/services/hetzner-dns.service';
 export * from './modules/providers/implementations/hetzner/hetzner-capabilities.service';
 
 // Scaleway
 export * from './modules/providers/implementations/scaleway/scaleway-provider.service';
 export * from './modules/providers/implementations/scaleway/scaleway-firewall.service';
+export * from './modules/providers/implementations/scaleway/scaleway-dns.service';
 export * from './modules/providers/implementations/scaleway/scaleway-capabilities.service';
 export * from './modules/providers/implementations/scaleway/scaleway-instances.adapter';
 export * from './modules/providers/implementations/scaleway/scaleway-baremetal.adapter';
