@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotImplementedException } from '@nestjs/common';
+import { Injectable, Logger, NotImplementedException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ICloudProvider,
@@ -24,15 +24,20 @@ import { DeleteServerDto } from '../../../infrastructure/servers/dto/delete-serv
 import { ServerResponseDto } from '../../../infrastructure/servers/dto/server-response.dto';
 import { CloudProvider } from '../../enums/cloud-provider.enum';
 import { NodeSizeDto } from '../../dto/node-size.dto';
+import {
+  CredentialUnavailableError,
+  rethrowIfCredentialError,
+} from '../../errors/credential-error';
 import { OvhCatalog, OvhFlavor } from './ovh-catalog';
 import { macroRegionsOf } from './ovh-regions';
 import {
   OpenStackClient,
   OpenStackServer,
-  NeutronNetwork,
+  NeutronPort,
   NeutronSubnet,
 } from './openstack-client';
 import { buildOvhOpenStackClient } from './ovh-openstack';
+import { packRegionId, parseRegionId, toVNetDetails } from './ovh-vnet-map';
 
 /**
  * OVH provider — OpenStack under the hood. This phase implements the READ-ONLY
@@ -45,9 +50,13 @@ export class OvhProviderService implements ICloudProvider {
   private readonly logger = new Logger(OvhProviderService.name);
   private readonly catalog: OvhCatalog;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional() injectedClient?: OpenStackClient,
+  ) {
     const subsidiary = this.configService.get<string>('OVH_SUBSIDIARY', 'FR');
     this.catalog = new OvhCatalog(undefined, subsidiary);
+    if (injectedClient) this.client = injectedClient;
   }
 
   async getNodeSizes(): Promise<NodeSizeDto[]> {
@@ -102,9 +111,10 @@ export class OvhProviderService implements ICloudProvider {
   private requireClient(): OpenStackClient {
     const client = this.osClient();
     if (!client) {
-      throw new NotImplementedException(
+      throw new CredentialUnavailableError(
         'OVH live operations require OpenStack credentials in the environment ' +
           '(OS_AUTH_URL / OS_USERNAME / OS_PASSWORD / OS_PROJECT_ID / OS_REGION_NAME).',
+        'ovh',
       );
     }
     return client;
@@ -134,6 +144,7 @@ export class OvhProviderService implements ICloudProvider {
           const flavorNames = await this.flavorNameMap(client, region);
           return servers.map((s) => this.toServerDto(s, region, flavorNames));
         } catch (e) {
+          rethrowIfCredentialError(e, CloudProvider.OVH);
           this.logger.warn(`OVH listServers(${region}) failed: ${String(e)}`);
           return [];
         }
@@ -350,14 +361,16 @@ export class OvhProviderService implements ICloudProvider {
     const perRegion = await Promise.all(
       regions.map(async (region) => {
         try {
-          const [networks, subnets] = await Promise.all([
+          const [networks, subnets, ports] = await Promise.all([
             client.listNetworksFull(region),
             client.listSubnets(region),
+            this.portsOrNone(client.listPorts(region), region),
           ]);
           return networks
             .filter((n) => !n.shared && !n['router:external'])
-            .map((n) => OvhProviderService.toVNetDetails(region, n, subnets, []));
+            .map((n) => toVNetDetails(region, n, subnets, ports));
         } catch (e) {
+          rethrowIfCredentialError(e, CloudProvider.OVH);
           this.logger.warn(`OVH listVNets(${region}) failed: ${String(e)}`);
           return [];
         }
@@ -374,9 +387,23 @@ export class OvhProviderService implements ICloudProvider {
     if (!net) return null;
     const [subnets, ports] = await Promise.all([
       client.listSubnets(region, id),
-      client.listNetworkPorts(region, id).catch(() => []),
+      this.portsOrNone(client.listNetworkPorts(region, id), region),
     ]);
-    return OvhProviderService.toVNetDetails(region, net, subnets, ports);
+    return toVNetDetails(region, net, subnets, ports);
+  }
+
+  /** Attachments degrade to "none reported" rather than losing the network itself. */
+  private async portsOrNone(
+    pending: Promise<NeutronPort[]>,
+    region: string,
+  ): Promise<NeutronPort[]> {
+    try {
+      return await pending;
+    } catch (e) {
+      rethrowIfCredentialError(e, CloudProvider.OVH);
+      this.logger.warn(`OVH port list (${region}) failed; attachments omitted: ${String(e)}`);
+      return [];
+    }
   }
 
   async deleteVNet(vnetId: string): Promise<VNetDeletionResult> {
@@ -443,52 +470,4 @@ export class OvhProviderService implements ICloudProvider {
     return {};
   }
 
-  private static toVNetDetails(
-    region: string,
-    net: NeutronNetwork,
-    subnets: NeutronSubnet[],
-    ports: { device_id?: string; network_id?: string }[],
-  ): VNetDetails {
-    const mine = subnets.filter((s) => net.subnets.includes(s.id));
-    const attached = [
-      ...new Set(
-        ports.flatMap((p) =>
-          p.network_id === net.id && p.device_id ? [p.device_id] : [],
-        ),
-      ),
-    ];
-    return {
-      id: packRegionId(region, net.id),
-      name: net.name,
-      ipRange: mine[0]?.cidr ?? '',
-      subnets: mine.map((s) => ({
-        id: s.id,
-        ipRange: s.cidr,
-        networkZone: region,
-        gateway: s.gateway_ip ?? undefined,
-      })),
-      routes: [],
-      attachedServerIds: attached,
-      labels: tagsToLabels(net.tags),
-    };
-  }
-}
-
-function packRegionId(region: string, id: string): string {
-  return `${region}/${id}`;
-}
-
-function parseRegionId(value: string): { region?: string; id: string } {
-  const i = value.indexOf('/');
-  if (i < 0) return { id: value };
-  return { region: value.slice(0, i), id: value.slice(i + 1) };
-}
-
-function tagsToLabels(tags?: string[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const t of tags ?? []) {
-    const i = t.indexOf('=');
-    if (i > 0) out[t.slice(0, i)] = t.slice(i + 1);
-  }
-  return out;
 }

@@ -10,6 +10,7 @@ export * from './modules/providers/enums/cloud-provider.enum';
 export * from './modules/providers/enums/dns-provider.enum';
 export * from './modules/providers/interfaces/cloud-provider.interface';
 export * from './modules/providers/interfaces/credential-provider.interface';
+export * from './modules/providers/errors/credential-error';
 export * from './modules/providers/interfaces/firewall-provider.interface';
 export * from './modules/providers/interfaces/dns-provider.interface';
 export * from './modules/providers/interfaces/network-provider.interface';
@@ -55,6 +56,7 @@ export * from './modules/providers/implementations/ovh/ovh-capabilities.service'
 export * from './modules/providers/implementations/ovh/ovh-catalog';
 export * from './modules/providers/implementations/ovh/ovh-regions';
 export * from './modules/providers/implementations/ovh/openstack-client';
+export * from './modules/providers/implementations/ovh/ovh-vnet-map';
 
 // Cherry Servers: public catalog (EUR prices, per-region stock) + full provisioning
 export * from './modules/providers/implementations/cherry/cherry-provider.service';

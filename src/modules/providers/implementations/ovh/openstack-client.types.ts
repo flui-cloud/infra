@@ -88,6 +88,8 @@ export interface NeutronSecurityGroup {
 export interface NeutronPort {
   id: string;
   device_id: string;
+  /** `compute:<az>` for instance ports, `network:dhcp` / `network:router_interface` for Neutron's own. */
+  device_owner?: string;
   network_id?: string;
   security_groups: string[];
 }
