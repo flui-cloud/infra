@@ -101,6 +101,16 @@ export interface SSHKeyDetails {
   labels?: Record<string, string>;
 }
 
+export interface SSHKeyListOptions {
+  /**
+   * Restrict the listing to keys carrying the Flui management labels. Defaults to `true`,
+   * which is what every existing caller expects. Pass `false` to see the account's keys as
+   * they really are — required to answer "is THIS public key registered here?", where a key
+   * created in the provider's own console counts just as much as one Flui created.
+   */
+  managedOnly?: boolean;
+}
+
 /**
  * Flui SSH key data passed to the provider for resolution.
  * The provider uses this to create or retrieve the key on the cloud platform
@@ -192,7 +202,7 @@ export interface ICloudProvider {
   ): Promise<void>;
 
   // SSH Key Management
-  listSSHKeys?(): Promise<SSHKeyDto[]>;
+  listSSHKeys?(opts?: SSHKeyListOptions): Promise<SSHKeyDto[]>;
   createSSHKey?(
     name: string,
     publicKey: string,

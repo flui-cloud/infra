@@ -7,6 +7,7 @@ import {
   ServerDeletionResult,
   SSHKeyCreationResult,
   SSHKeyDetails,
+  SSHKeyListOptions,
   SshKeyInfo,
   AttachedVolumeResult,
   ChangeServerTypeConfig,
@@ -15,6 +16,7 @@ import {
 } from '../interfaces/cloud-provider.interface';
 import { InstanceEntity } from '../../instances/entities/instance.entity';
 import { ICredentialProvider } from '../interfaces/credential-provider.interface';
+import { rethrowIfCredentialError } from '../errors/credential-error';
 import { CloudProvider } from '../enums/cloud-provider.enum';
 import axios, { AxiosInstance } from 'axios';
 import * as https from 'node:https';
@@ -604,6 +606,7 @@ export class HetznerProviderService implements ICloudProvider {
         netBandwidthOutBytes: latest('network.0.bandwidth.out'),
       };
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.warn(
         `Failed to get server metrics for ${serverId}: ${this.describeError(error)}`,
       );
@@ -620,6 +623,7 @@ export class HetznerProviderService implements ICloudProvider {
 
       return response.data.server;
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.warn(
         `Failed to get server details for ${serverId}: ${this.describeError(error)}`,
       );
@@ -950,6 +954,7 @@ export class HetznerProviderService implements ICloudProvider {
         createdAt: v.created,
       }));
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.warn(
         `Hetzner listFluiManagedVolumes failed: ${error.message}`,
       );
@@ -975,6 +980,7 @@ export class HetznerProviderService implements ICloudProvider {
         })
         .filter((s): s is ServerResponseDto => s !== null);
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.error(
         `Failed to list servers from Hetzner API: ${this.describeError(error)}`,
       );
@@ -993,6 +999,7 @@ export class HetznerProviderService implements ICloudProvider {
 
       return this.mapHetznerServerToDto(serverDetails);
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.warn(
         `Failed to get server details as DTO for ${serverId}: ${this.describeError(error)}`,
       );
@@ -1042,7 +1049,8 @@ export class HetznerProviderService implements ICloudProvider {
     };
   }
 
-  async listSSHKeys(): Promise<SSHKeyDto[]> {
+  async listSSHKeys(opts?: SSHKeyListOptions): Promise<SSHKeyDto[]> {
+    const managedOnly = opts?.managedOnly ?? true;
     try {
       const sshKeysApi = await this.createSSHKeysApi();
       const allKeys: SSHKeyDto[] = [];
@@ -1061,7 +1069,7 @@ export class HetznerProviderService implements ICloudProvider {
         );
 
         const keys = response.data.ssh_keys
-          .filter((sshKey) => this.isFluiManagedKey(sshKey.labels))
+          .filter((sshKey) => !managedOnly || this.isFluiManagedKey(sshKey.labels))
           .map((sshKey) => this.mapHetznerSSHKeyToDto(sshKey));
 
         allKeys.push(...keys);
@@ -1078,6 +1086,7 @@ export class HetznerProviderService implements ICloudProvider {
       this.logger.log(`Retrieved ${allKeys.length} SSH keys from Hetzner`);
       return allKeys;
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.error(
         `Failed to list SSH keys from Hetzner API: ${this.describeError(error)}`,
       );
@@ -1187,6 +1196,7 @@ export class HetznerProviderService implements ICloudProvider {
 
       return sortedNodeSizes;
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       //error.errors for each concatenate message an log them
       this.logger.error(
         `Failed to fetch Hetzner node sizes: ${this.describeError(error)}`,

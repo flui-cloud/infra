@@ -90,10 +90,19 @@ export class ScalewayIamAdapter {
     return projectId;
   }
 
+  /** Every page: Scaleway defaults to 20 per page, so a single call silently truncates and a
+   * caller asking "is this key registered?" gets a confident no for anything past page one. */
   async listSSHKeys(): Promise<ScalewayIamV1alpha1SSHKey[]> {
     const api = await this.createSSHKeysApi();
-    const resp = await api.listSSHKeys();
-    return resp.data.ssh_keys ?? [];
+    const pageSize = 100;
+    const keys: ScalewayIamV1alpha1SSHKey[] = [];
+    for (let page = 1; ; page++) {
+      const resp = await api.listSSHKeys(undefined, page, pageSize);
+      const batch = resp.data.ssh_keys ?? [];
+      keys.push(...batch);
+      const total = resp.data.total_count ?? keys.length;
+      if (batch.length < pageSize || keys.length >= total) return keys;
+    }
   }
 
   async createSSHKey(
