@@ -8,6 +8,7 @@ import {
   FirewallFilters,
 } from '../../interfaces/firewall-provider.interface';
 import { ICredentialProvider } from '../../interfaces/credential-provider.interface';
+import { rethrowIfCredentialError } from '../../errors/credential-error';
 import { CloudProvider } from '../../enums/cloud-provider.enum';
 import { LabelService } from '../../../common/services/label.service';
 import {
@@ -464,6 +465,7 @@ export class ScalewayFirewallService implements IFirewallProvider {
         });
       return this.scalewayRulesToFlui(sg, this.mergeScalewayRules(rawRules));
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.SCALEWAY);
       this.logger.error(
         `Failed to get security group ${firewallId}`,
         error.message,
@@ -523,6 +525,7 @@ export class ScalewayFirewallService implements IFirewallProvider {
       );
       return enriched;
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.SCALEWAY);
       this.logger.error(
         'Failed to list Scaleway security groups',
         error.message,

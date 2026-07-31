@@ -1,4 +1,5 @@
 import { CatalogEntry, OpenStackConfig, TokenState } from './openstack-client.types';
+import { CredentialRejectedError } from '../../errors/credential-error';
 
 /**
  * Keystone v3 + service-catalog core. Authenticates once, caches the token until
@@ -99,6 +100,15 @@ export abstract class OpenStackHttpBase {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
+      // Keystone is where an OS_* credential is judged; a 401 here is the
+      // credential being refused, not the compute API failing.
+      if (res.status === 401) {
+        throw new CredentialRejectedError(
+          `The OpenStack credential was refused by Keystone (HTTP 401 ${text.slice(0, 200)}). ` +
+            'Check OS_USERNAME / OS_PASSWORD / OS_PROJECT_ID.',
+          'ovh',
+        );
+      }
       throw new Error(`Keystone auth failed: HTTP ${res.status} ${text.slice(0, 200)}`);
     }
     const token = res.headers.get('x-subject-token');

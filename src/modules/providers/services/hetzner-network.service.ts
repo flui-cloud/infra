@@ -23,6 +23,8 @@ import {
   VNetRouteInfo,
 } from '../interfaces/network-provider.interface';
 import { Label } from '../interfaces/cloud-provider.interface';
+import { rethrowIfCredentialError } from '../errors/credential-error';
+import { CloudProvider } from '../enums/cloud-provider.enum';
 
 @Injectable()
 export class HetznerNetworkService implements INetworkProvider {
@@ -200,6 +202,7 @@ export class HetznerNetworkService implements INetworkProvider {
         created: network.created,
       };
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       if (error.response?.status === 404) {
         this.logger.warn(`VNet ${vnetId} not found`);
         return null;
@@ -253,6 +256,7 @@ export class HetznerNetworkService implements INetworkProvider {
         };
       });
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.error(`Failed to list VNets: ${error.message}`, error.stack);
       throw new Error(`Failed to list VNets from Hetzner: ${error.message}`);
     }

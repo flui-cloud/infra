@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotImplementedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CreateFirewallConfig,
@@ -16,6 +16,7 @@ import {
   OpenStackClient,
 } from './openstack-client';
 import { buildOvhOpenStackClient } from './ovh-openstack';
+import { CredentialUnavailableError } from '../../errors/credential-error';
 
 /**
  * OVH firewall = OpenStack Neutron security groups. Region-scoped in Neutron, so
@@ -36,9 +37,10 @@ export class OvhFirewallService implements IFirewallProvider {
       this.client = buildOvhOpenStackClient(this.configService);
     }
     if (!this.client) {
-      throw new NotImplementedException(
+      throw new CredentialUnavailableError(
         'OVH firewall operations require OpenStack credentials in the environment ' +
           '(OS_AUTH_URL / OS_USERNAME / OS_PASSWORD / OS_PROJECT_ID / OS_REGION_NAME).',
+        'ovh',
       );
     }
     return this.client;

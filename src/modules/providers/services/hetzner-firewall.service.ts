@@ -15,6 +15,7 @@ import {
   FirewallFilters,
 } from '../interfaces/firewall-provider.interface';
 import { ICredentialProvider } from '../interfaces/credential-provider.interface';
+import { rethrowIfCredentialError } from '../errors/credential-error';
 import { CloudProvider } from '../enums/cloud-provider.enum';
 import { LabelService } from '../../common/services/label.service';
 import axios, { AxiosInstance } from 'axios';
@@ -302,6 +303,7 @@ export class HetznerFirewallService implements IFirewallProvider {
         })),
       };
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       if (error.response?.status === 404) {
         this.logger.warn(`Firewall ${firewallId} not found`);
         return null;
@@ -349,6 +351,7 @@ export class HetznerFirewallService implements IFirewallProvider {
         })),
       }));
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.error(
         `Failed to list firewalls: ${this.describeError(error)}`,
       );
@@ -502,6 +505,7 @@ export class HetznerFirewallService implements IFirewallProvider {
 
       return serverIds;
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.HETZNER);
       this.logger.error(
         `Failed to find servers with label selector ${labelSelector}`,
         error,

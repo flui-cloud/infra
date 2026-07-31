@@ -16,6 +16,10 @@ import {
 import { SSHKeyDto } from '../../../access/dto/ssh-key.dto';
 import { ScalewayIamAdapter } from './scaleway-iam.adapter';
 import { ICredentialProvider } from '../../interfaces/credential-provider.interface';
+import {
+  rethrowIfCredentialError,
+  rethrowIfCredentialsBlockedAll,
+} from '../../errors/credential-error';
 import { CloudProvider } from '../../enums/cloud-provider.enum';
 import {
   CreateVNetConfig,
@@ -683,8 +687,18 @@ export class ScalewayProviderService implements ICloudProvider {
         if (r.status === 'fulfilled') dtos.push(...r.value);
       }
 
+      // Every zone is asked separately and a zone that fails is dropped, so a
+      // refused token would otherwise read as an account with no servers.
+      if (!dtos.length) {
+        rethrowIfCredentialsBlockedAll(
+          [...instanceResults, ...baremetalResults],
+          CloudProvider.SCALEWAY,
+        );
+      }
+
       return dtos;
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.SCALEWAY);
       this.logger.error('Failed to list Scaleway servers', error.message);
       return [];
     }
@@ -722,6 +736,7 @@ export class ScalewayProviderService implements ICloudProvider {
         return this.mapBaremetalServerToDto(server, parsed.zone);
       }
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.SCALEWAY);
       this.logger.warn(
         `Failed to get Scaleway server details for ${serverId}`,
         error.message,
@@ -1794,6 +1809,7 @@ export class ScalewayProviderService implements ICloudProvider {
 
       return nodeSizes;
     } catch (error) {
+      rethrowIfCredentialError(error, CloudProvider.SCALEWAY);
       this.logger.error('Failed to fetch Scaleway node sizes', error.message);
       return [];
     }
