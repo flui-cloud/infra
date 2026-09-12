@@ -128,6 +128,16 @@ export class ContaboProviderService implements ICloudProvider {
 
   async createServer(config: CreateServerConfig): Promise<ServerCreationResult> {
     const api = new InstancesApi(await this.apiConfig());
+    // Contabo's create has no label/tag field, and `toServerDto` has none to read back.
+    // A caller that marks ownership with a label gets an instance it cannot recognise
+    // later, so say it at create rather than let the marker vanish silently.
+    if (config.labels?.length) {
+      this.logger.warn(
+        `Contabo provider: create ignores labels (${config.labels
+          .map((l) => `${l.key}=${l.value}`)
+          .join(', ')}) — the API has no field for them, so this instance will carry no ownership marker.`,
+      );
+    }
     const request: CreateInstanceRequest = {
       period: 1,
       imageId: config.image,

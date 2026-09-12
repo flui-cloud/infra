@@ -199,6 +199,9 @@ export class OvhProviderService implements ICloudProvider {
       private_ip: privateIp,
       created_at: s.created ? new Date(s.created) : new Date(0),
       updated_at: s.updated ? new Date(s.updated) : new Date(0),
+      // createServer writes `config.labels` into Nova metadata; without this the DTO
+      // dropped them, so an ownership marker written at create could never be read back.
+      labels: Object.entries(s.metadata ?? {}).map(([key, value]) => ({ key, value })),
     };
   }
 

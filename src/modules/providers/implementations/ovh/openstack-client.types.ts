@@ -35,6 +35,8 @@ export interface OpenStackServer {
   status: string;
   created?: string;
   updated?: string;
+  /** Nova's key/value map — where `CreateServerConfig.labels` is written and read back. */
+  metadata?: Record<string, string>;
   flavor?: { id?: string; original_name?: string };
   addresses?: Record<
     string,
