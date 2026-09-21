@@ -22,6 +22,7 @@ import {
   ServerTypesApi,
 } from 'src/modules/providers/implementations/hetzner/generated';
 import { getRegionCoordinates } from '../../data/region-coordinates';
+import { macroRegionOf } from '../../data/macro-region';
 
 @Injectable()
 export class HetznerCapabilitiesService
@@ -225,6 +226,21 @@ export class HetznerCapabilitiesService
             displayName: 'Europe (Central)',
             coveredRegions: ['fsn1', 'nbg1', 'hel1'],
           },
+          {
+            id: 'us-east',
+            displayName: 'US East',
+            coveredRegions: ['ash'],
+          },
+          {
+            id: 'us-west',
+            displayName: 'US West',
+            coveredRegions: ['hil'],
+          },
+          {
+            id: 'ap-southeast',
+            displayName: 'Asia Pacific (Southeast)',
+            coveredRegions: ['sin'],
+          },
         ],
         supportsSubnets: true,
         subnetPerZone: true,
@@ -249,7 +265,6 @@ export class HetznerCapabilitiesService
 
   private mapHetznerLocationsToRegions(locations: any[]): ProviderRegion[] {
     return locations
-      .filter((location) => this.isEuropeanLocation(location))
       .map((location) => {
         const coords = getRegionCoordinates(
           CloudProvider.HETZNER,
@@ -263,39 +278,16 @@ export class HetznerCapabilitiesService
           available: true,
           flagEmoji: this.getCountryFlag(location.country),
           country: location.country,
+          // Hetzner answers with an ISO alpha-2 code, which is what a
+          // macro-region is derived from.
+          countryCode: location.country,
+          macroRegion: macroRegionOf(location.country) ?? undefined,
           latitude: coords?.latitude,
           longitude: coords?.longitude,
         };
       });
   }
 
-  private isEuropeanLocation(location: any): boolean {
-    if (location.network_zone === 'eu-central') {
-      return true;
-    }
-
-    const europeanCountries = [
-      'DE',
-      'FI',
-      'NL',
-      'AT',
-      'BE',
-      'FR',
-      'IT',
-      'ES',
-      'PL',
-      'CZ',
-      'SE',
-      'NO',
-      'DK',
-      'CH',
-      'GB',
-      'IE',
-      'PT',
-    ];
-
-    return europeanCountries.includes(location.country);
-  }
 
   private mapHetznerServerTypesToInstanceTypes(
     serverTypes: any[],

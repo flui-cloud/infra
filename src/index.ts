@@ -54,6 +54,7 @@ export * from './modules/providers/implementations/ovh/ovh-provider.service';
 export * from './modules/providers/implementations/ovh/ovh-firewall.service';
 export * from './modules/providers/implementations/ovh/ovh-capabilities.service';
 export * from './modules/providers/implementations/ovh/ovh-catalog';
+export * from './modules/providers/data/macro-region';
 export * from './modules/providers/implementations/ovh/ovh-regions';
 export * from './modules/providers/implementations/ovh/openstack-client';
 export * from './modules/providers/implementations/ovh/ovh-vnet-map';

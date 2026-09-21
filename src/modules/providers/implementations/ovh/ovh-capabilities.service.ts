@@ -15,6 +15,7 @@ import {
 import { ValidationResultDto } from '../../../management/dto/validation-result.dto';
 import { OvhCatalog } from './ovh-catalog';
 import { OVH_REGIONS } from './ovh-regions';
+import { macroRegionOf } from '../../data/macro-region';
 
 const OVH_LOGO = Buffer.from(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#000e9c"/><text x="16" y="21" font-family="Arial" font-size="11" font-weight="bold" fill="#fff" text-anchor="middle">OVH</text></svg>',
@@ -36,6 +37,8 @@ export class OvhCapabilitiesService implements IProviderCapabilitiesService {
       location: `${r.city}, ${r.country}`,
       available: true,
       country: r.country,
+      countryCode: r.cc,
+      macroRegion: macroRegionOf(r.cc) ?? undefined,
       latitude: r.lat,
       longitude: r.lng,
     }));
