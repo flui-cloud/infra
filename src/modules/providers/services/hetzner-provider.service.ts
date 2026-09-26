@@ -1,5 +1,5 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, Inject } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ICloudProvider,
   CreateServerConfig,
@@ -13,13 +13,13 @@ import {
   ChangeServerTypeConfig,
   ProviderVolumeSummary,
   ServerMetricsDto,
-} from '../interfaces/cloud-provider.interface';
-import { InstanceEntity } from '../../instances/entities/instance.entity';
-import { ICredentialProvider } from '../interfaces/credential-provider.interface';
-import { rethrowIfCredentialError } from '../errors/credential-error';
-import { CloudProvider } from '../enums/cloud-provider.enum';
-import axios, { AxiosInstance } from 'axios';
-import * as https from 'node:https';
+} from "../interfaces/cloud-provider.interface";
+import { InstanceEntity } from "../../instances/entities/instance.entity";
+import { ICredentialProvider } from "../interfaces/credential-provider.interface";
+import { rethrowIfCredentialError } from "../errors/credential-error";
+import { CloudProvider } from "../enums/cloud-provider.enum";
+import axios, { AxiosInstance } from "axios";
+import * as https from "node:https";
 import {
   Configuration,
   ServersApi,
@@ -38,17 +38,17 @@ import {
   VolumeActionsApi,
   CreateVolumeRequest,
   GetServerMetricsTypeEnum,
-} from 'src/modules/providers/implementations/hetzner/generated';
-import { NodeSizeDto } from '../dto/node-size.dto';
-import { PricingDto, PricingQueryDto } from '../dto/pricing.dto';
-import { NodeSizeMapper } from '../mappers/node-size.mapper';
-import { PricingMapper } from '../mappers/pricing.mapper';
-import { InstanceStatus } from '../../instances/entities/instance-status.enum';
-import { ServerResponseDto } from 'src/modules/infrastructure/servers/dto/server-response.dto';
-import { DeleteServerDto } from 'src/modules/infrastructure/servers/dto/delete-server.dto';
-import { SSHKeyDto } from 'src/modules/access/dto/ssh-key.dto';
-import { LabelService } from '../../common/services/label.service';
-import { HetznerNetworkService } from './hetzner-network.service';
+} from "src/modules/providers/implementations/hetzner/generated";
+import { NodeSizeDto } from "../dto/node-size.dto";
+import { PricingDto, PricingQueryDto } from "../dto/pricing.dto";
+import { NodeSizeMapper } from "../mappers/node-size.mapper";
+import { PricingMapper } from "../mappers/pricing.mapper";
+import { InstanceStatus } from "../../instances/entities/instance-status.enum";
+import { ServerResponseDto } from "src/modules/infrastructure/servers/dto/server-response.dto";
+import { DeleteServerDto } from "src/modules/infrastructure/servers/dto/delete-server.dto";
+import { SSHKeyDto } from "src/modules/access/dto/ssh-key.dto";
+import { LabelService } from "../../common/services/label.service";
+import { HetznerNetworkService } from "./hetzner-network.service";
 import {
   CreateVNetConfig,
   VNetCreationResult,
@@ -62,7 +62,8 @@ import {
   DetachServerFromVNetConfig,
   ServerVNetAttachmentResult,
   ChangeIpRangeConfig,
-} from '../interfaces/network-provider.interface';
+} from "../interfaces/network-provider.interface";
+import { serverLocation } from "../implementations/hetzner/server-location";
 
 @Injectable()
 export class HetznerProviderService implements ICloudProvider {
@@ -73,22 +74,22 @@ export class HetznerProviderService implements ICloudProvider {
 
   constructor(
     private readonly configService: ConfigService,
-    @Inject('ICredentialProvider')
+    @Inject("ICredentialProvider")
     private readonly credentialProvider: ICredentialProvider,
     private readonly nodeSizeMapper: NodeSizeMapper,
     private readonly pricingMapper: PricingMapper,
     private readonly labelService: LabelService,
   ) {
     this.basePath = this.configService.get<string>(
-      'HETZNER_API_BASE_PATH',
-      'https://api.hetzner.cloud/v1',
+      "HETZNER_API_BASE_PATH",
+      "https://api.hetzner.cloud/v1",
     );
     this.defaultUser = this.configService.get<string>(
-      'HETZNER_DEFAULT_USER',
-      'root',
+      "HETZNER_DEFAULT_USER",
+      "root",
     );
     this.timeout = Number.parseInt(
-      this.configService.get<string>('HETZNER_TIMEOUT', '10000'),
+      this.configService.get<string>("HETZNER_TIMEOUT", "10000"),
       10,
     );
   }
@@ -111,10 +112,10 @@ export class HetznerProviderService implements ICloudProvider {
       timeout: this.timeout,
       httpsAgent,
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'Flui-Cloud-API/1.0',
-        Connection: 'keep-alive',
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Flui-Cloud-API/1.0",
+        Connection: "keep-alive",
       },
       validateStatus: (status) => status >= 200 && status < 300,
     });
@@ -131,7 +132,7 @@ export class HetznerProviderService implements ICloudProvider {
       (error) => {
         const errDetails = error.response?.data
           ? ` — ${JSON.stringify(error.response.data)}`
-          : '';
+          : "";
         this.logger.error(
           `Hetzner API Request Error: ${error.message}${errDetails}`,
         );
@@ -187,9 +188,9 @@ export class HetznerProviderService implements ICloudProvider {
       basePath: this.basePath,
       baseOptions: {
         headers: {
-          'User-Agent': 'Flui-Cloud-API/1.0',
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+          "User-Agent": "Flui-Cloud-API/1.0",
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
       },
     });
@@ -284,9 +285,9 @@ export class HetznerProviderService implements ICloudProvider {
         basePath: this.basePath,
         baseOptions: {
           headers: {
-            'User-Agent': 'Flui-Cloud-API/1.0',
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
+            "User-Agent": "Flui-Cloud-API/1.0",
+            "Content-Type": "application/json",
+            Accept: "application/json",
           },
         },
       });
@@ -305,7 +306,7 @@ export class HetznerProviderService implements ICloudProvider {
         return false;
       }
 
-      this.logger.error('Hetzner API key validation error:', error.message);
+      this.logger.error("Hetzner API key validation error:", error.message);
       return false;
     }
   }
@@ -328,9 +329,11 @@ export class HetznerProviderService implements ICloudProvider {
     // Map data center and region configuration. A just-created server may not
     // have these populated yet — tolerate missing fields instead of throwing
     // and voiding the whole instance list.
-    instance.dataCenter = server.datacenter?.name ?? 'unknown';
-    instance.region = server.datacenter?.location?.name ?? 'unknown';
-    instance.regionName = server.datacenter?.location?.description ?? '';
+    const location = serverLocation(server as never);
+    instance.dataCenter =
+      server.datacenter?.name ?? location?.name ?? "unknown";
+    instance.region = location?.name ?? "unknown";
+    instance.regionName = location?.description ?? "";
 
     // Map hardware specifications
     instance.cpuCores = server.server_type?.cores ?? 0;
@@ -347,22 +350,22 @@ export class HetznerProviderService implements ICloudProvider {
       v4: server.public_net?.ipv4
         ? {
             ip: server.public_net.ipv4.ip,
-            gateway: '', // Information not available in the response
+            gateway: "", // Information not available in the response
             netmaskCidr: 32, // Standard IPv4
           }
         : undefined,
       v6: server.public_net?.ipv6
         ? {
             ip: server.public_net.ipv6.ip,
-            gateway: '', // Information not available in the response
+            gateway: "", // Information not available in the response
             netmaskCidr: 64, // Standard IPv6
           }
         : undefined,
     };
 
     // Additional information
-    instance.productType = server.server_type?.name ?? 'unknown';
-    instance.productName = server.server_type?.description ?? '';
+    instance.productType = server.server_type?.name ?? "unknown";
+    instance.productName = server.server_type?.description ?? "";
     instance.defaultUser = this.defaultUser; // Default user for Hetzner servers
 
     // Additional IPs (floating IPs)
@@ -426,12 +429,12 @@ export class HetznerProviderService implements ICloudProvider {
       // Map our config to Hetzner API request
       const createRequest: CreateServerRequest = {
         name: config.name,
-        server_type: config.server_type || 'cx11',
-        image: 'ubuntu-24.04',
-        location: config.location || 'nbg1',
+        server_type: config.server_type || "cx11",
+        image: "ubuntu-24.04",
+        location: config.location || "nbg1",
         start_after_create: true,
         ssh_keys: config.ssh_keys || [],
-        user_data: config.user_data || '',
+        user_data: config.user_data || "",
       };
 
       // Convert label array to Record for Hetzner API
@@ -537,12 +540,12 @@ export class HetznerProviderService implements ICloudProvider {
   private describeError(error: any): string {
     const api = error?.response?.data?.error;
     if (api?.message) {
-      const code = api.code ? ` (${api.code})` : '';
+      const code = api.code ? ` (${api.code})` : "";
       return api.message + code;
     }
     const status = error?.response?.status;
-    const suffix = status ? ` [HTTP ${status}]` : '';
-    return (error?.message ?? 'unknown error') + suffix;
+    const suffix = status ? ` [HTTP ${status}]` : "";
+    return (error?.message ?? "unknown error") + suffix;
   }
 
   async getServerStatus(serverId: string): Promise<string> {
@@ -557,10 +560,10 @@ export class HetznerProviderService implements ICloudProvider {
       );
 
       if (error.response?.status === 404) {
-        return 'not-found';
+        return "not-found";
       }
 
-      return 'error';
+      return "error";
     }
   }
 
@@ -583,27 +586,27 @@ export class HetznerProviderService implements ICloudProvider {
         ],
         start.toISOString(),
         end.toISOString(),
-        '60',
+        "60",
       );
       const series = response.data.metrics?.time_series ?? {};
       const latest = (name: string): number | null => {
         const values = series[name]?.values;
         if (!values?.length) return null;
         const raw = values[values.length - 1]?.[1];
-        const n = typeof raw === 'number' ? raw : Number(raw);
+        const n = typeof raw === "number" ? raw : Number(raw);
         return Number.isFinite(n) ? n : null;
       };
-      const cpu = latest('cpu');
+      const cpu = latest("cpu");
       return {
         serverId,
         at: response.data.metrics?.end ?? end.toISOString(),
         cpuPercent: cpu === null ? null : Math.round(cpu * 100) / 100,
-        diskIopsRead: latest('disk.0.iops.read'),
-        diskIopsWrite: latest('disk.0.iops.write'),
-        diskBandwidthReadBytes: latest('disk.0.bandwidth.read'),
-        diskBandwidthWriteBytes: latest('disk.0.bandwidth.write'),
-        netBandwidthInBytes: latest('network.0.bandwidth.in'),
-        netBandwidthOutBytes: latest('network.0.bandwidth.out'),
+        diskIopsRead: latest("disk.0.iops.read"),
+        diskIopsWrite: latest("disk.0.iops.write"),
+        diskBandwidthReadBytes: latest("disk.0.bandwidth.read"),
+        diskBandwidthWriteBytes: latest("disk.0.bandwidth.write"),
+        netBandwidthInBytes: latest("network.0.bandwidth.in"),
+        netBandwidthOutBytes: latest("network.0.bandwidth.out"),
       };
     } catch (error) {
       rethrowIfCredentialError(error, CloudProvider.HETZNER);
@@ -674,7 +677,7 @@ export class HetznerProviderService implements ICloudProvider {
         // Check if action failed
         if (action.status === ActionStatusEnum.Error) {
           const errorMsg =
-            action.error?.message || 'Unknown error during action execution';
+            action.error?.message || "Unknown error during action execution";
           throw new Error(`Action ${actionId} failed: ${errorMsg}`);
         }
 
@@ -729,9 +732,9 @@ export class HetznerProviderService implements ICloudProvider {
       }
 
       // Check if server is running and force is not set
-      if (!config.force && serverDetails.status === 'running') {
+      if (!config.force && serverDetails.status === "running") {
         throw new Error(
-          'Server is running. Use force=true to delete running servers.',
+          "Server is running. Use force=true to delete running servers.",
         );
       }
 
@@ -899,7 +902,7 @@ export class HetznerProviderService implements ICloudProvider {
       return { actionId: res.data.action?.id };
     } catch (error) {
       const apiError = error.response?.data?.error;
-      if (apiError?.code === 'locked') {
+      if (apiError?.code === "locked") {
         this.logger.warn(
           `Hetzner volume ${volumeId} locked — likely already detaching`,
         );
@@ -926,7 +929,7 @@ export class HetznerProviderService implements ICloudProvider {
         return;
       }
       const apiError = error.response?.data?.error;
-      if (apiError?.code === 'volume_already_attached') {
+      if (apiError?.code === "volume_already_attached") {
         throw new Error(
           `Volume ${volumeId} still attached — call detachVolume first`,
         );
@@ -942,7 +945,7 @@ export class HetznerProviderService implements ICloudProvider {
         undefined,
         undefined,
         undefined,
-        'managed-by=flui-cloud',
+        "managed-by=flui-cloud",
       );
       return (response.data.volumes ?? []).map((v) => ({
         volumeId: String(v.id),
@@ -1033,12 +1036,12 @@ export class HetznerProviderService implements ICloudProvider {
     // initializes; never let one incomplete record throw and void the whole list
     // (that silently breaks the create-idempotency check → duplicate-name 409s).
     return {
-      id: server.id?.toString() ?? '',
+      id: server.id?.toString() ?? "",
       name: server.name,
       provider: CloudProvider.HETZNER,
-      provider_resource_id: server.id?.toString() ?? '',
-      server_type: server.server_type?.name ?? 'unknown',
-      location: server.datacenter?.location?.name ?? 'unknown',
+      provider_resource_id: server.id?.toString() ?? "",
+      server_type: server.server_type?.name ?? "unknown",
+      location: serverLocation(server as never)?.name ?? "unknown",
       status: server.status,
       public_ip: server.public_net?.ipv4?.ip || null,
       private_ip: server.private_net?.[0]?.ip || null,
@@ -1069,7 +1072,9 @@ export class HetznerProviderService implements ICloudProvider {
         );
 
         const keys = response.data.ssh_keys
-          .filter((sshKey) => !managedOnly || this.isFluiManagedKey(sshKey.labels))
+          .filter(
+            (sshKey) => !managedOnly || this.isFluiManagedKey(sshKey.labels),
+          )
           .map((sshKey) => this.mapHetznerSSHKeyToDto(sshKey));
 
         allKeys.push(...keys);
@@ -1117,17 +1122,17 @@ export class HetznerProviderService implements ICloudProvider {
     labels: Record<string, string> | null | undefined,
   ): boolean {
     if (!labels) return false;
-    const isManagedByFlui = labels['managed-by'] === 'flui-cloud';
-    const isLegacyFluiCli = labels['flui-cli'] === 'true';
+    const isManagedByFlui = labels["managed-by"] === "flui-cloud";
+    const isLegacyFluiCli = labels["flui-cli"] === "true";
     return isManagedByFlui || isLegacyFluiCli;
   }
 
   private extractKeyType(publicKey: string): string {
-    if (publicKey.startsWith('ssh-rsa')) return 'rsa';
-    if (publicKey.startsWith('ssh-ed25519')) return 'ed25519';
-    if (publicKey.startsWith('ssh-dss')) return 'dsa';
-    if (publicKey.startsWith('ecdsa-sha2')) return 'ecdsa';
-    return 'unknown';
+    if (publicKey.startsWith("ssh-rsa")) return "rsa";
+    if (publicKey.startsWith("ssh-ed25519")) return "ed25519";
+    if (publicKey.startsWith("ssh-dss")) return "dsa";
+    if (publicKey.startsWith("ecdsa-sha2")) return "ecdsa";
+    return "unknown";
   }
 
   /**
@@ -1152,7 +1157,7 @@ export class HetznerProviderService implements ICloudProvider {
 
       // Filter out ARM architecture servers
       nodeSizes = nodeSizes.filter(
-        (nodeSize) => nodeSize.architecture !== 'arm',
+        (nodeSize) => nodeSize.architecture !== "arm",
       );
 
       // If requested, project the per-location availability that listServerTypes()
@@ -1210,7 +1215,7 @@ export class HetznerProviderService implements ICloudProvider {
    * Get pricing information from Hetzner
    */
   async getPricing(query: PricingQueryDto): Promise<PricingDto> {
-    this.logger.log('Fetching pricing from Hetzner API', query);
+    this.logger.log("Fetching pricing from Hetzner API", query);
 
     try {
       const pricingApi = await this.createPricingApi();
@@ -1357,7 +1362,7 @@ export class HetznerProviderService implements ICloudProvider {
         const result = await this.createSSHKey(key.name, key.publicKey);
         providerIds.push(result.id);
       } catch (error) {
-        if (error.message?.includes('already exists')) {
+        if (error.message?.includes("already exists")) {
           // Key exists — find it by fingerprint or name
           const existing = await this.listSSHKeys();
           const match = existing.find(
