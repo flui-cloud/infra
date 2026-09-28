@@ -5,7 +5,11 @@
  * region availability) at a public, unauthenticated endpoint, so this works with
  * zero credentials — it's the real-time pricing source that OpenStack itself
  * cannot provide (Nova has flavors but no prices). Hourly flavors are the
- * `<flavor>.consumption` addons; monthly is the sibling `<flavor>.monthly.postpaid`.
+ * `<flavor>.consumption` addons; the sibling `<flavor>.monthly.postpaid` is the
+ * monthly plan, a discounted commitment that has to be opted into per server.
+ * Servers created through Nova are billed by the hour with no monthly cap, so
+ * `monthly` is what such a server costs when it runs all month (hourly × 730)
+ * and the plan price is kept apart as `monthlyPlan`.
  * Prices are integers in micro-cents (1 EUR = 100_000_000).
  */
 
@@ -14,6 +18,7 @@ import { isDeniedOvhFlavor } from './ovh-flavor-denylist';
 const OVH_PRICE_DIVISOR = 100_000_000;
 const HOURLY_SUFFIX = '.consumption';
 const MONTHLY_SUFFIX = '.monthly.postpaid';
+export const OVH_HOURS_PER_MONTH = 730;
 
 export interface OvhFlavor {
   code: string; // OVH flavor name, e.g. "b2-7"
@@ -25,6 +30,7 @@ export interface OvhFlavor {
   storageType: string; // SSD | local | NVMe | ...
   hourly: number | null;
   monthly: number | null;
+  monthlyPlan: number | null;
   regions: string[];
   currency: string;
 }
@@ -77,6 +83,7 @@ export function normalizeOvhCatalog(catalog: OvhCatalogResponse): OvhFlavor[] {
     if (isDeniedOvhFlavor(base)) continue;
     const disks = tech.storage?.disks ?? [];
     const regions = addon.configurations?.find((c) => c.name === 'region')?.values ?? [];
+    const hourly = priceOf(byPlan, base + HOURLY_SUFFIX);
 
     flavors.push({
       code: tech['name'] ?? addon.blobs?.commercial?.name ?? base,
@@ -86,8 +93,9 @@ export function normalizeOvhCatalog(catalog: OvhCatalogResponse): OvhFlavor[] {
       ramGb: tech.memory.size,
       diskGb: disks.reduce((sum, d) => sum + (d.capacity ?? 0), 0),
       storageType: disks[0]?.technology ?? 'local',
-      hourly: priceOf(byPlan, base + HOURLY_SUFFIX),
-      monthly: priceOf(byPlan, base + MONTHLY_SUFFIX),
+      hourly,
+      monthly: hourly == null ? null : Math.round(hourly * OVH_HOURS_PER_MONTH * 100) / 100,
+      monthlyPlan: priceOf(byPlan, base + MONTHLY_SUFFIX),
       regions,
       currency,
     });
