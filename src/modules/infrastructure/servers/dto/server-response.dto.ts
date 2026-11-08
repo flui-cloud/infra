@@ -64,6 +64,11 @@ export class ServerResponseDto {
   @ApiProperty({ description: 'Server location/datacenter' })
   location: string;
 
+  @ApiPropertyOptional({
+    description: 'Availability zone inside the location, where the provider has them',
+  })
+  zone?: string;
+
   @ApiProperty({ description: 'Current server status' })
   status: string;
 

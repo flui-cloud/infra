@@ -37,3 +37,18 @@ export function macroRegionsOf(dcCodes: string[]): string[] {
   const set = new Set(dcCodes.map(toMacroRegion).filter((c) => OVH_MACRO_CODES.includes(c)));
   return set.size ? [...set] : [...OVH_MACRO_CODES];
 }
+
+/**
+ * An availability zone of an OVH region that has three (`eu-west-par-a`), or
+ * null for anything else: a region code (`EU-WEST-PAR`, `GRA11`) leaves the
+ * zone to Nova.
+ */
+export function ovhAvailabilityZone(location?: string | null): string | null {
+  const zone = location?.trim().toLowerCase();
+  return zone && /^[a-z]+-[a-z]+-[a-z]+-[a-z]$/.test(zone) ? zone : null;
+}
+
+/** The compute region an availability zone belongs to: `eu-west-par-a` → `EU-WEST-PAR`. */
+export function ovhRegionOfZone(zone: string): string {
+  return zone.slice(0, zone.lastIndexOf('-')).toUpperCase();
+}

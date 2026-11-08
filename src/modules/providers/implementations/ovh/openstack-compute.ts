@@ -71,6 +71,7 @@ export abstract class OpenStackCompute extends OpenStackHttpBase {
         ...(spec.securityGroups
           ? { security_groups: spec.securityGroups.map((name) => ({ name })) }
           : {}),
+        ...(spec.availabilityZone ? { availability_zone: spec.availabilityZone } : {}),
       },
     });
     return body.server;

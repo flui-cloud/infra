@@ -29,7 +29,7 @@ import {
   rethrowIfCredentialError,
 } from '../../errors/credential-error';
 import { OvhCatalog, OvhFlavor } from './ovh-catalog';
-import { macroRegionsOf } from './ovh-regions';
+import { macroRegionsOf, ovhAvailabilityZone, ovhRegionOfZone } from './ovh-regions';
 import {
   OpenStackClient,
   OpenStackServer,
@@ -194,6 +194,7 @@ export class OvhProviderService implements ICloudProvider {
         flavorId ??
         'unknown',
       location: region,
+      zone: ovhAvailabilityZone(s['OS-EXT-AZ:availability_zone']) ?? undefined,
       status: s.status,
       public_ip: publicIp,
       private_ip: privateIp,
@@ -238,8 +239,13 @@ export class OvhProviderService implements ICloudProvider {
 
   async createServer(config: CreateServerConfig): Promise<ServerCreationResult> {
     const client = this.requireClient();
-    const region = await client.resolveComputeRegion(config.location);
-    this.logger.log(`Creating OVH server ${config.name} in ${region} via Nova`);
+    const zone = ovhAvailabilityZone(config.location);
+    const region = await client.resolveComputeRegion(
+      zone ? ovhRegionOfZone(zone) : config.location,
+    );
+    this.logger.log(
+      `Creating OVH server ${config.name} in ${zone ?? region} via Nova`,
+    );
 
     const flavorName = config.server_type ?? 's1-2';
     const imageName = config.image ?? 'Ubuntu 24.04';
@@ -272,6 +278,7 @@ export class OvhProviderService implements ICloudProvider {
       metadata: config.labels?.length
         ? Object.fromEntries(config.labels.map((l) => [l.key, l.value]))
         : undefined,
+      availabilityZone: zone ?? undefined,
     });
 
     // Nova's create response (202) carries only the id — re-read once so the

@@ -38,6 +38,7 @@ export interface OpenStackServer {
   /** Nova's key/value map — where `CreateServerConfig.labels` is written and read back. */
   metadata?: Record<string, string>;
   flavor?: { id?: string; original_name?: string };
+  'OS-EXT-AZ:availability_zone'?: string;
   addresses?: Record<
     string,
     { addr: string; version: number; 'OS-EXT-IPS:type'?: string }[]
@@ -58,6 +59,7 @@ export interface CreateServerSpec {
   userData?: string; // base64
   metadata?: Record<string, string>;
   securityGroups?: string[];
+  availabilityZone?: string;
 }
 
 export interface NovaInterface {
